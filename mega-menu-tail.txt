@@ -1,0 +1,580 @@
+  });
+
+  // Fetch featured agents
+  const { data: agents = [] } = useQuery<Agent[]>({
+    queryKey: ["/api/agents/featured"],
+    enabled: !isMobile,
+  });
+
+  // Fetch featured companies
+  const { data: companies = [] } = useQuery<Company[]>({
+    queryKey: ["/api/companies/featured"],
+    enabled: !isMobile,
+  });
+
+  // Create a search URL with parameters
+  const createSearchUrl = (category: any) => {
+    if (!category || !category.query) return "/search-results";
+
+    const searchParams = new URLSearchParams();
+
+    // Add all query parameters to the search URL
+    for (const [key, value] of Object.entries(category.query)) {
+      searchParams.append(key, String(value));
+    }
+
+    return `/search-results?${searchParams.toString()}`;
+  };
+
+  // Filter properties based on the active category query
+  const getFilteredProperties = (category: any) => {
+    if (!category || !category.query) return [];
+
+    return properties
+      .filter((property) => {
+        for (const [key, value] of Object.entries(category.query)) {
+          if (key === "propertyType" && property.propertyType !== value)
+            return false;
+          if (key === "premium" && property.premium !== value) return false;
+          if (key === "verified" && property.verified !== value) return false;
+          if (key === "forSaleOrRent" && property.rentOrSale !== value)
+            return false;
+          // Add more filters as needed
+        }
+        return true;
+      })
+      .slice(0, 2); // Display only 2 properties per category
+  };
+
+  // State to track which mobile menu category is expanded
+  const [expandedMobileCategory, setExpandedMobileCategory] = useState<
+    string | null
+  >(null);
+
+  // Toggle mobile category expansion
+  const toggleMobileCategory = (category: string) => {
+    setExpandedMobileCategory(
+      expandedMobileCategory === category ? null : category,
+    );
+  };
+
+  if (isMobile) {
+    // Enhanced mobile view with expandable sections
+    return (
+      <div
+        className="flex flex-col space-y-1 pt-2 pb-3  overflow-y-auto overscroll-contain rounded-md"
+        style={{
+          WebkitOverflowScrolling: "touch",
+          scrollbarWidth: "thin",
+          scrollbarColor: "#CBD5E0 #F7FAFC",
+          position: "relative",
+          height: "35vh",
+          maxWidth: "90vw",
+          margin: "0 auto",
+        }}
+      >
+        {/* Buyer Section */}
+        <div className="border-b border-gray-100 pb-2 mb-1">
+          <div
+            className="flex justify-between items-center py-2 px-1 cursor-pointer"
+            onClick={() => toggleMobileCategory("buyer")}
+          >
+            <span className="text-gray-800 font-medium">Buyer</span>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className={`transition-transform ${expandedMobileCategory === "buyer" ? "rotate-180" : ""}`}
+            >
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </div>
+
+          {expandedMobileCategory === "buyer" && (
+            <div className="pl-3 mt-1 space-y-2 animate-slideDown">
+              {buyMenuItems.map((item) => (
+                <Link
+                  key={item.title}
+                  to={item.href}
+                  className="flex items-center py-1.5 text-sm text-gray-600 hover:text-primary"
+                >
+                  <span className="mr-2">{item.icon}</span>
+                  {item.title}
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Seller Section */}
+        <Link
+          to="/add-property"
+          className="text-gray-800 font-medium py-2 px-1 border-b border-gray-100 mb-1"
+        >
+          Seller
+        </Link>
+
+        {/* Agents Section */}
+        <div className="border-b border-gray-100 pb-2 mb-1">
+          <div
+            className="flex justify-between items-center py-2 px-1 cursor-pointer"
+            onClick={() => toggleMobileCategory("agents")}
+          >
+            <span className="text-gray-800 font-medium">Agents</span>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className={`transition-transform ${expandedMobileCategory === "agents" ? "rotate-180" : ""}`}
+            >
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </div>
+
+          {expandedMobileCategory === "agents" && (
+            <div className="pl-3 mt-1 space-y-2 animate-slideDown">
+              {agentMenuItems.map((item) => (
+                <Link
+                  key={item.title}
+                  to={item.href}
+                  className="flex items-center py-1.5 text-sm text-gray-600 hover:text-primary"
+                >
+                  <span className="mr-2">{item.icon}</span>
+                  {item.title}
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Companies Section */}
+        <div className="border-b border-gray-100 pb-2 mb-1">
+          <div
+            className="flex justify-between items-center py-2 px-1 cursor-pointer"
+            onClick={() => toggleMobileCategory("companies")}
+          >
+            <span className="text-gray-800 font-medium">Companies</span>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className={`transition-transform ${expandedMobileCategory === "companies" ? "rotate-180" : ""}`}
+            >
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </div>
+
+          {expandedMobileCategory === "companies" && (
+            <div className="pl-3 mt-1 space-y-2 animate-slideDown">
+              {companyMenuItems.map((item) => (
+                <Link
+                  key={item.title}
+                  to={item.href}
+                  className="flex items-center py-1.5 text-sm text-gray-600 hover:text-primary"
+                >
+                  <span className="mr-2">{item.icon}</span>
+                  {item.title}
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Projects Section */}
+        <div className="border-b border-gray-100 pb-2 mb-1">
+          <div
+            className="flex justify-between items-center py-2 px-1 cursor-pointer"
+            onClick={() => toggleMobileCategory("projects")}
+          >
+            <span className="text-gray-800 font-medium">Projects</span>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className={`transition-transform ${expandedMobileCategory === "projects" ? "rotate-180" : ""}`}
+            >
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </div>
+
+          {expandedMobileCategory === "projects" && (
+            <div className="pl-3 mt-1 space-y-2 animate-slideDown">
+              {projectMenuItems.map((item) => (
+                <Link
+                  key={item.title}
+                  to={item.href}
+                  className="flex items-center py-1.5 text-sm text-gray-600 hover:text-primary"
+                >
+                  <span className="mr-2">{item.icon}</span>
+                  {item.title}
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Resources Section */}
+        <div className="border-b border-gray-100 pb-2 mb-1">
+          <div
+            className="flex justify-between items-center py-2 px-1 cursor-pointer"
+            onClick={() => toggleMobileCategory("resources")}
+          >
+            <span className="text-gray-800 font-medium">Resources</span>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className={`transition-transform ${expandedMobileCategory === "resources" ? "rotate-180" : ""}`}
+            >
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </div>
+
+          {expandedMobileCategory === "resources" && (
+            <div className="pl-3 mt-1 space-y-2 animate-slideDown">
+              {resourceMenuItems.map((item) => (
+                <Link
+                  key={item.title}
+                  to={item.href}
+                  className="flex items-center py-1.5 text-sm text-gray-600 hover:text-primary"
+                >
+                  <span className="mr-2">{item.icon}</span>
+                  {item.title}
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Desktop view with complex mega menu
+  return (
+    <NavigationMenu>
+      <NavigationMenuList>
+        <NavigationMenuItem>
+          <NavigationMenuTrigger
+            className={cn(
+              "bg-transparent hover:bg-transparent focus:bg-transparent",
+              pathname.startsWith("/properties") && "text-primary font-medium",
+            )}
+          >
+            Buyer
+          </NavigationMenuTrigger>
+          <NavigationMenuContent>
+            <div className="grid w-[850px] grid-cols-6 p-4 md:grid-cols-6">
+              <div className="col-span-2 p-2">
+                <div className="mb-2 mt-1 text-base font-medium">
+                  Property Types
+                </div>
+                <div className="space-y-1">
+                  {buyMenuItems.map((item) => (
+                    <div key={item.title}>
+                      <NavigationMenuLink asChild>
+                        <Link to={createSearchUrl(item)}>
+                          {" "}
+                          {/* Use dynamic search URL with filters */}
+                          <div
+                            className="flex cursor-pointer items-start space-x-3 rounded-md p-2.5 hover:bg-muted"
+                            onMouseEnter={() => setActiveCategory(item.title)}
+                          >
+                            {item.icon}
+                            <div>
+                              <div className="text-sm font-medium">
+                                {item.title}
+                              </div>
+                              <p className="line-clamp-1 text-xs text-muted-foreground">
+                                {item.description}
+                              </p>
+                            </div>
+                          </div>
+                        </Link>
+                      </NavigationMenuLink>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="col-span-4 p-2">
+                <div className="mb-3 mt-1 text-base font-medium">
+                  {activeCategory ? activeCategory : "Featured Properties"}
+                </div>
+
+                {activeCategory ? (
+                  <div>
+                    <div className="mb-3">
+                      <h4 className="text-sm font-medium mb-1.5">Highlights</h4>
+                      <div className="flex flex-wrap gap-1.5">
+                        {buyMenuItems
+                          .find((item) => item.title === activeCategory)
+                          ?.highlights.map((highlight, idx) => (
+                            <Badge
+                              key={idx}
+                              variant="outline"
+                              className="bg-primary-50 text-xs"
+                            >
+                              {highlight}
+                            </Badge>
+                          ))}
+                      </div>
+                    </div>
+
+                    <div className="mb-4">
+                      <h4 className="text-sm font-medium mb-1.5">Features</h4>
+                      <div className="grid grid-cols-2 gap-1">
+                        {buyMenuItems
+                          .find((item) => item.title === activeCategory)
+                          ?.features.map((feature, idx) => (
+                            <div
+                              key={idx}
+                              className="flex items-center text-xs text-gray-600"
+                            >
+                              <CheckCircle2 className="h-3 w-3 mr-1 text-green-500" />{" "}
+                              {feature}
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      {getFilteredProperties(
+                        buyMenuItems.find(
+                          (item) => item.title === activeCategory,
+                        ),
+                      ).map((property) => (
+                        <div key={property.id} className="col-span-1">
+                          <Link to={`/properties/${property.id}`}>
+                            {" "}
+                            {/* Changed to react-router-dom Link */}
+                            <PropertyMiniCard property={property} />
+                          </Link>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-3">
+                    {properties.slice(0, 4).map((property) => (
+                      <div key={property.id} className="col-span-1">
+                        <Link to={`/properties/${property.id}`}>
+                          {" "}
+                          {/* Changed to react-router-dom Link */}
+                          <PropertyMiniCard property={property} />
+                        </Link>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </NavigationMenuContent>
+        </NavigationMenuItem>
+
+        <NavigationMenuItem>
+          <NavigationMenuLink asChild>
+            <Link
+              to="/add-property"
+              className={cn(
+                navigationMenuTriggerStyle(),
+                pathname === "/add-property" && "text-primary font-medium",
+              )}
+            >
+              Seller
+            </Link>
+          </NavigationMenuLink>
+        </NavigationMenuItem>
+
+        <NavigationMenuItem>
+          <NavigationMenuTrigger
+            className={cn(
+              "bg-transparent hover:bg-transparent focus:bg-transparent",
+              pathname.startsWith("/agents") && "text-primary font-medium",
+            )}
+          >
+            Agents
+          </NavigationMenuTrigger>
+          <NavigationMenuContent>
+            <div className="grid w-[600px] grid-cols-6 p-4 md:grid-cols-6">
+              <div className="col-span-2 p-2">
+                <div className="mb-2 mt-1 text-base font-medium">
+                  Find Agents
+                </div>
+                <div className="space-y-1">
+                  {agentMenuItems.map((item) => (
+                    <div key={item.title}>
+                      <NavigationMenuLink asChild>
+                        <Link to={createSearchUrl(item)}>
+                          {" "}
+                          {/* Use dynamic search URL with filters */}
+                          <div className="flex cursor-pointer items-start space-x-3 rounded-md p-2.5 hover:bg-muted">
+                            {item.icon}
+                            <div>
+                              <div className="text-sm font-medium">
+                                {item.title}
+                              </div>
+                              <p className="line-clamp-1 text-xs text-muted-foreground">
+                                {item.description}
+                              </p>
+                            </div>
+                          </div>
+                        </Link>
+                      </NavigationMenuLink>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="col-span-4 p-2">
+                <div className="mb-3 mt-1 text-base font-medium">
+                  Featured Agents
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  {agents.slice(0, 4).map((agent) => (
+                    <div key={agent.id} className="col-span-1">
+                      <Link to={`/agents/${agent.id}`}>
+                        {" "}
+                        {/* Changed to react-router-dom Link */}
+                        <AgentMiniCard agent={agent} />
+                      </Link>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </NavigationMenuContent>
+        </NavigationMenuItem>
+
+        <NavigationMenuItem>
+          <NavigationMenuTrigger
+            className={cn(
+              "bg-transparent hover:bg-transparent focus:bg-transparent",
+              pathname.startsWith("/companies") && "text-primary font-medium",
+            )}
+          >
+            Companies
+          </NavigationMenuTrigger>
+          <NavigationMenuContent>
+            <div className="grid w-[600px] grid-cols-6 p-4 md:grid-cols-6">
+              <div className="col-span-2 p-2">
+                <div className="mb-2 mt-1 text-base font-medium">
+                  Find Companies
+                </div>
+                <div className="space-y-1">
+                  {companyMenuItems.map((item) => (
+                    <div key={item.title}>
+                      <NavigationMenuLink asChild>
+                        <Link to={createSearchUrl(item)}>
+                          {" "}
+                          {/* Use dynamic search URL with filters */}
+                          <div className="flex cursor-pointer items-start space-x-3 rounded-md p-2.5 hover:bg-muted">
+                            {item.icon}
+                            <div>
+                              <div className="text-sm font-medium">
+                                {item.title}
+                              </div>
+                              <p className="line-clamp-1 text-xs text-muted-foreground">
+                                {item.description}
+                              </p>
+                            </div>
+                          </div>
+                        </Link>
+                      </NavigationMenuLink>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="col-span-4 p-2">
+                <div className="mb-3 mt-1 text-base font-medium">
+                  Featured Companies
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  {companies.slice(0, 4).map((company) => (
+                    <div key={company.id} className="col-span-1">
+                      <Link to={`/companies/${company.id}`}>
+                        {" "}
+                        {/* Changed to react-router-dom Link */}
+                        <CompanyMiniCard company={company} />
+                      </Link>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </NavigationMenuContent>
+        </NavigationMenuItem>
+
+        <NavigationMenuItem>
+          <NavigationMenuTrigger
+            className={cn(
+              "bg-transparent hover:bg-transparent focus:bg-transparent",
+              pathname.startsWith("/resources") && "text-primary font-medium",
+            )}
+          >
+            Resources
+          </NavigationMenuTrigger>
+          <NavigationMenuContent>
+            <div className="w-[400px] p-4">
+              <div className="mb-2 mt-1 text-base font-medium">
+                Guides & Articles
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {resourceMenuItems.map((item) => (
+                  <div key={item.title}>
+                    <NavigationMenuLink asChild>
+                      <Link to={item.href}>
+                        {" "}
+                        {/* Changed to react-router-dom Link */}
+                        <div className="flex cursor-pointer items-start space-x-3 rounded-md p-3 hover:bg-muted">
+                          {item.icon}
+                          <div>
+                            <div className="text-sm font-medium">
+                              {item.title}
+                            </div>
+                            <p className="line-clamp-1 text-xs text-muted-foreground">
+                              {item.description}
+                            </p>
+                          </div>
+                        </div>
+                      </Link>
+                    </NavigationMenuLink>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </NavigationMenuContent>
+        </NavigationMenuItem>
+      </NavigationMenuList>
+    </NavigationMenu>
+  );
+}

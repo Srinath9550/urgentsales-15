@@ -1,0 +1,100 @@
+import { useState, useEffect } from "react";
+import { Link, useLocation } from "wouter";
+import {
+  NavigationMenu,
+  NavigationMenuContent,
+  NavigationMenuItem,
+  NavigationMenuLink,
+  NavigationMenuList,
+  NavigationMenuTrigger,
+  navigationMenuTriggerStyle,
+} from "@/components/ui/navigation-menu";
+import { cn } from "@/lib/utils";
+import { useQuery } from "@tanstack/react-query";
+import {
+  Building2,
+  Users,
+  Home,
+  Building,
+  MapPin,
+  TrendingUp,
+  Briefcase,
+  Landmark,
+  UserSquare2,
+  Layers3,
+  Star,
+  AreaChart,
+  Medal,
+  CheckCircle2,
+  Clock,
+  ThumbsUp,
+  GraduationCap,
+  Award,
+  MapPinned,
+  LineChart,
+  IndianRupee,
+  Bed,
+  Bath,
+  Maximize,
+  Shield,
+} from "lucide-react";
+import { Card } from "@/components/ui/card";
+import { Property, Agent, Company } from "@shared/schema";
+import { Badge } from "@/components/ui/badge";
+
+// Mega menu items for Buy Properties
+const buyMenuItems = [
+  {
+    title: "Residential Properties",
+    href: "/properties?type=residential",
+    description: "Find your dream home among our residential listings",
+    icon: <Home className="h-5 w-5 text-primary" />,
+    query: { propertyType: "house" },
+    highlights: ["Family-friendly", "Modern amenities", "Ready to move in"],
+    features: ["Community living", "Security", "Parks & recreation"],
+  },
+  {
+    title: "Apartments & Flats",
+    href: "/properties?propertyType=apartment",
+    description: "Modern apartments in prime locations",
+    icon: <Building className="h-5 w-5 text-primary" />,
+    query: { propertyType: "apartment" },
+    highlights: ["Low maintenance", "Great investment", "Urban living"],
+    features: ["24x7 security", "Parking", "Clubhouse"],
+  },
+  {
+    title: "Villas & Independent Houses",
+    href: "/properties?propertyType=villa",
+    description: "Luxurious villas with premium amenities",
+    icon: <Building2 className="h-5 w-5 text-primary" />,
+    query: { propertyType: "villa" },
+    highlights: ["Luxury living", "Privacy", "Premium neighborhoods"],
+    features: ["Private garden", "Swimming pools", "Spacious interiors"],
+  },
+  {
+    title: "Plots & Land",
+    href: "/properties?propertyType=plot",
+    description: "Investment plots and land parcels",
+    icon: <MapPin className="h-5 w-5 text-primary" />,
+    query: { propertyType: "plot" },
+    highlights: [
+      "Appreciate over time",
+      "Build custom home",
+      "Asset investment",
+    ],
+    features: ["Clear titles", "Development potential", "Prime locations"],
+  },
+  {
+    title: "Commercial Properties",
+    href: "/properties?propertyType=commercial",
+    description: "Office spaces and retail properties",
+    icon: <Briefcase className="h-5 w-5 text-primary" />,
+    query: { propertyType: "commercial" },
+    highlights: ["Business growth", "Strategic locations", "Rental income"],
+    features: ["Infrastructure", "Tech-ready", "Business districts"],
+  },
+  {
+    title: "Newly Launched Projects",
+    href: "/properties?status=new_launch",
+    description: "Be the first to explore latest launches",
+    icon: <TrendingUp className="h-5 w-5 text-primary" />,
