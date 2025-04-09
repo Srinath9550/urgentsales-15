@@ -39,11 +39,13 @@ interface OwnerPlan {
   features: OwnerPlanFeature;
   color: string;
   buttonColor: string;
+  badgeColor?: string; // Add this property
   isFree?: boolean;
   isBestValue?: boolean;
 }
 
 const OwnerAdPackages = () => {
+  // Update all plans to include the badgeColor property
   const plans: OwnerPlan[] = [
     {
       id: "free",
@@ -52,7 +54,7 @@ const OwnerAdPackages = () => {
       price: "Free",
       numericPrice: 0,
       gst: "",
-      icon: <Home className="h-8 w-8 text-blue-600" />,
+      icon: <span className="text-3xl">🆓</span>,
       features: {
         adListings: 3,
         topUrgencyList: false,
@@ -76,8 +78,10 @@ const OwnerAdPackages = () => {
       },
       color: "blue",
       buttonColor: "bg-blue-600 hover:bg-blue-700 text-white",
+      badgeColor: "bg-blue-600 text-white", // Add this
       isFree: true,
     },
+    // Update the Quick Sell Plan with proper colors
     {
       id: "quicksell",
       name: "Quick Sell Plan",
@@ -86,7 +90,7 @@ const OwnerAdPackages = () => {
       numericPrice: 4999,
       discount: "28% OFF",
       gst: "+ 18% GST",
-      icon: <Rocket className="h-8 w-8 text-pink-600" />,
+      icon:<span className="text-2xl">🚀</span>,
       features: {
         adListings: 10,
         topUrgencyList: true,
@@ -108,8 +112,8 @@ const OwnerAdPackages = () => {
         highImpactDisplay: "15 Days",
         planValidity: "3 Months",
       },
-      color: "pink",
-      buttonColor: "bg-pink-600 hover:bg-pink-700 text-white",
+      color: "indigo",
+      buttonColor: "bg-indigo-600 hover:bg-indigo-700 text-white",
     },
     {
       id: "fasttrack",
@@ -261,7 +265,7 @@ const OwnerAdPackages = () => {
                       <h3 className="font-bold">{plan.name}</h3>
                     </div>
                     {plan.discount && (
-                      <Badge className="bg-red-500">{plan.discount}</Badge>
+                      <Badge className="bg-green-500">{plan.discount}</Badge>
                     )}
                     {plan.isBestValue && (
                       <Badge className="bg-amber-500 ml-1">Best Value</Badge>
@@ -460,7 +464,7 @@ const OwnerAdPackages = () => {
                         <div className="mb-1">{plan.icon}</div>
                         <span className="font-bold">{plan.name}</span>
                         {plan.discount && (
-                          <Badge className="bg-red-500 text-white my-1">{plan.discount}</Badge>
+                          <Badge className="bg-green-500 text-white my-1">{plan.discount}</Badge>
                         )}
                         <div className="mt-1">
                           {plan.originalPrice !== plan.price && (

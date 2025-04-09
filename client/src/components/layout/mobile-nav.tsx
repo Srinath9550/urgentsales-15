@@ -56,8 +56,19 @@ export default function MobileNav() {
     {
       name: "Post",
       icon: <PlusCircle className={isSmallScreen ? "h-5 w-5" : "h-6 w-6"} />,
-      path: "/post-property-free",
-      action: () => navigate("/post-property-free"),
+      path: user ? "/post-property-free" : "/auth",
+      action: () => {
+        if (!user) {
+          toast({
+            title: "Login Required",
+            description: "You need to login before posting a property.",
+            variant: "default",
+          });
+          navigate("/auth");
+        } else {
+          navigate("/post-property-free");
+        }
+      },
       highlight: true,
     },
     {

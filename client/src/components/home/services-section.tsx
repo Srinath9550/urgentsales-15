@@ -67,26 +67,26 @@ export default function ServicesSection() {
       href: "/services/property-management",
       onClick: () => window.scrollTo(0, 0),
     },
-    {
-      icon: <Search className="h-6 w-6" />,
-      title: "Property Search",
-      description:
-        "Looking for a reliable real estate broker near me or nearby real estate office? Discover your perfect home or commercial space effortlessly using our advanced property search engine, powered by the expertise of our trusted real estate consultants.",
-      imageSrc:
-        "https://images.unsplash.com/photo-1560518883-ce09059eeffa?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=600&q=80",
-      href: "/services/property-search",
-      onClick: () => window.scrollTo(0, 0),
-    },
-    {
-      icon: <Home className="h-6 w-6" />,
-      title: "Commercial and Industrial Real Estate",
-      description:
-        "As an established industrial real estate agency, we connect businesses with ideal commercial and industrial properties. Whether you're looking for offices, warehouses, retail spaces, or factories, our expert team helps you secure prime locations to grow your real estate business effectively.",
-      imageSrc:
-        "https://images.unsplash.com/photo-1582407947304-fd86f028f716?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=600&q=80",
-      href: "/services/commercial-industrial",
-      onClick: () => window.scrollTo(0, 0),
-    },
+    // {
+    //   icon: <Search className="h-6 w-6" />,
+    //   title: "Property Search",
+    //   description:
+    //     "Looking for a reliable real estate broker near me or nearby real estate office? Discover your perfect home or commercial space effortlessly using our advanced property search engine, powered by the expertise of our trusted real estate consultants.",
+    //   imageSrc:
+    //     "https://images.unsplash.com/photo-1560518883-ce09059eeffa?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=600&q=80",
+    //   href: "/services/property-search",
+    //   onClick: () => window.scrollTo(0, 0),
+    // },
+    // {
+    //   icon: <Home className="h-6 w-6" />,
+    //   title: "Commercial and Industrial Real Estate",
+    //   description:
+    //     "As an established industrial real estate agency, we connect businesses with ideal commercial and industrial properties. Whether you're looking for offices, warehouses, retail spaces, or factories, our expert team helps you secure prime locations to grow your real estate business effectively.",
+    //   imageSrc:
+    //     "https://images.unsplash.com/photo-1582407947304-fd86f028f716?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=600&q=80",
+    //   href: "/services/commercial-industrial",
+    //   onClick: () => window.scrollTo(0, 0),
+    // },
     {
       icon: <Key className="h-6 w-6" />,
       title: "Real Estate Investment Advisory",
@@ -97,9 +97,6 @@ export default function ServicesSection() {
       href: "/services/investment-advisory",
       onClick: () => window.scrollTo(0, 0),
     },
-  ];
-
-  const advancedServices = [
     {
       icon: <Shield className="h-6 w-6" />,
       title: "Property Legal Solutions",
@@ -116,6 +113,25 @@ export default function ServicesSection() {
         "https://images.unsplash.com/photo-1573164574230-db1d5e960238?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=600&q=80",
       href: "/services/financial-management",
     },
+  ];
+
+  const advancedServices = [
+    // {
+    //   icon: <Shield className="h-6 w-6" />,
+    //   title: "Property Legal Solutions",
+    //   description: "Expert legal advice for real estate transactions",
+    //   imageSrc:
+    //     "https://images.unsplash.com/photo-1589829545856-d10d557cf95f?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=600&q=80",
+    //   href: "/services/legal-solutions",
+    // },
+    // {
+    //   icon: <HandHelping className="h-6 w-6" />,
+    //   title: "Financial Management Services",
+    //   description: "Professional guidance for property investment decisions",
+    //   imageSrc:
+    //     "https://images.unsplash.com/photo-1573164574230-db1d5e960238?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=600&q=80",
+    //   href: "/services/financial-management",
+    // },
     {
       icon: <DollarSign className="h-6 w-6" />,
       title: "Investment Services",
@@ -125,15 +141,15 @@ export default function ServicesSection() {
         "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=60",
       href: "/services/investment-services",
     },
-    {
-      icon: <Settings className="h-6 w-6" />,
-      title: "Why Choose Us",
-      description:
-        "Discover what sets us apart from other real estate agencies",
-      imageSrc:
-        "https://cdn.corporatefinanceinstitute.com/assets/real-estate-investment-firms.jpeg",
-      href: "/services/why-choose-us",
-    },
+    // {
+    //   icon: <Settings className="h-6 w-6" />,
+    //   title: "Why Choose Us",
+    //   description:
+    //     "Discover what sets us apart from other real estate agencies",
+    //   imageSrc:
+    //     "https://cdn.corporatefinanceinstitute.com/assets/real-estate-investment-firms.jpeg",
+    //   href: "/services/why-choose-us",
+    // },
   ];
 
   return (
@@ -210,23 +226,7 @@ export default function ServicesSection() {
           </div>
         </div>
 
-        {/* Additional services with smaller cards */}
-        <h3 className="text-2xl font-bold mb-6 text-center">
-          Additional Premium Services
-        </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {advancedServices.map((service, index) => (
-            <ServiceCard
-              key={index}
-              icon={service.icon}
-              title={service.title}
-              description={service.description}
-              imageSrc={service.imageSrc}
-              href={service.href}
-
-            />
-          ))}
-        </div>
+      
       </div>
     </section>
   );

@@ -1,11 +1,61 @@
 import React from "react";
-import { Shield, FileText, Scale, Gavel, Phone } from "lucide-react";
+import { Shield, FileText, Scale, Gavel, Phone, Building, Key, DollarSign } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 import Navbar from "@/components/layout/navbar";
 import Footer from "@/components/layout/footer";
 
 export default function LegalSolutionsPage() {
+  // Current page identifier
+  const currentPage = "legal-solutions";
+
+  // Service links data
+  const serviceLinks = [
+    {
+      id: "why-choose-us",
+      title: "Why Choose Us",
+      icon: <Shield className="h-5 w-5" />,
+      color: "bg-blue-100",
+      textColor: "text-blue-600",
+      href: "/services/why-choose-us",
+    },
+    {
+      id: "property-management",
+      title: "Property Management",
+      icon: <Building className="h-5 w-5" />,
+      color: "bg-green-100",
+      textColor: "text-green-600",
+      href: "/services/property-management",
+    },
+    {
+      id: "investment-advisory",
+      title: "Investment Advisory",
+      icon: <Key className="h-5 w-5" />,
+      color: "bg-purple-100",
+      textColor: "text-purple-600",
+      href: "/services/investment-advisory",
+    },
+    {
+      id: "legal-solutions",
+      title: "Legal Solutions",
+      icon: <Shield className="h-5 w-5" />,
+      color: "bg-indigo-100",
+      textColor: "text-indigo-600",
+      href: "/services/legal-solutions",
+    },
+    {
+      id: "financial-management",
+      title: "Financial Management",
+      icon: <DollarSign className="h-5 w-5" />,
+      color: "bg-teal-100",
+      textColor: "text-teal-600",
+      href: "/services/financial-management",
+    },
+  ];
+
+  // Filter out the current page from service links
+  const relatedServices = serviceLinks.filter(service => service.id !== currentPage);
+
   return (
     <div className="bg-white">
       <Navbar />
@@ -99,15 +149,15 @@ export default function LegalSolutionsPage() {
           <div className="max-w-4xl mx-auto">
             <div className="relative">
               {/* Timeline */}
-              <div className="absolute left-0 md:left-1/2 h-full w-1 bg-indigo-200 transform md:translate-x-0"></div>
+              <div className="absolute left-1/2 h-full w-1 bg-indigo-200 transform -translate-x-1/2"></div>
 
               {/* Steps */}
               <div className="space-y-12">
-                <div className="relative flex flex-col md:flex-row items-center md:items-start">
-                  <div className="flex items-center justify-center w-10 h-10 rounded-full bg-indigo-600 text-white md:absolute md:left-1/2 md:-ml-5 z-10">
+                <div className="relative flex items-center">
+                  <div className="flex items-center justify-center w-10 h-10 rounded-full bg-indigo-600 text-white absolute left-1/2 -translate-x-1/2 z-10">
                     1
                   </div>
-                  <div className="mt-4 md:mt-0 md:ml-16 md:w-1/2 md:pl-8">
+                  <div className="w-1/2 pr-8 text-right">
                     <h3 className="text-xl font-semibold mb-2">
                       Initial Consultation
                     </h3>
@@ -116,13 +166,15 @@ export default function LegalSolutionsPage() {
                       legal needs and objectives.
                     </p>
                   </div>
+                  <div className="w-1/2 pl-8"></div>
                 </div>
 
-                <div className="relative flex flex-col md:flex-row items-center md:items-start">
-                  <div className="flex items-center justify-center w-10 h-10 rounded-full bg-indigo-600 text-white md:absolute md:left-1/2 md:-ml-5 z-10">
+                <div className="relative flex items-center">
+                  <div className="flex items-center justify-center w-10 h-10 rounded-full bg-indigo-600 text-white absolute left-1/2 -translate-x-1/2 z-10">
                     2
                   </div>
-                  <div className="mt-4 md:mt-0 md:mr-16 md:w-1/2 md:text-right">
+                  <div className="w-1/2 pr-8"></div>
+                  <div className="w-1/2 pl-8">
                     <h3 className="text-xl font-semibold mb-2">
                       Legal Assessment
                     </h3>
@@ -133,11 +185,11 @@ export default function LegalSolutionsPage() {
                   </div>
                 </div>
 
-                <div className="relative flex flex-col md:flex-row items-center md:items-start">
-                  <div className="flex items-center justify-center w-10 h-10 rounded-full bg-indigo-600 text-white md:absolute md:left-1/2 md:-ml-5 z-10">
+                <div className="relative flex items-center">
+                  <div className="flex items-center justify-center w-10 h-10 rounded-full bg-indigo-600 text-white absolute left-1/2 -translate-x-1/2 z-10">
                     3
                   </div>
-                  <div className="mt-4 md:mt-0 md:ml-16 md:w-1/2 md:pl-8">
+                  <div className="w-1/2 pr-8 text-right">
                     <h3 className="text-xl font-semibold mb-2">
                       Implementation
                     </h3>
@@ -147,13 +199,15 @@ export default function LegalSolutionsPage() {
                       behalf.
                     </p>
                   </div>
+                  <div className="w-1/2 pl-8"></div>
                 </div>
 
-                <div className="relative flex flex-col md:flex-row items-center md:items-start">
-                  <div className="flex items-center justify-center w-10 h-10 rounded-full bg-indigo-600 text-white md:absolute md:left-1/2 md:-ml-5 z-10">
+                <div className="relative flex items-center">
+                  <div className="flex items-center justify-center w-10 h-10 rounded-full bg-indigo-600 text-white absolute left-1/2 -translate-x-1/2 z-10">
                     4
                   </div>
-                  <div className="mt-4 md:mt-0 md:mr-16 md:w-1/2 md:text-right">
+                  <div className="w-1/2 pr-8"></div>
+                  <div className="w-1/2 pl-8">
                     <h3 className="text-xl font-semibold mb-2">
                       Resolution & Follow-up
                     </h3>
@@ -185,6 +239,31 @@ export default function LegalSolutionsPage() {
                     <Phone className="mr-2 h-4 w-4" /> Schedule a Consultation
                   </Link>
                 </Button>
+          </div>
+        </div>
+      </section>
+
+      {/* Related Tools & Resources Section */}
+      <section className="py-10 bg-gray-50">
+        <div className="container mx-auto px-4">
+          <div className="mb-8">
+            <h2 className="text-2xl md:text-3xl font-bold text-gray-900">Related Tools & Resources</h2>
+          </div>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+            {relatedServices.map((service) => (
+              <Link 
+                key={service.id} 
+                href={service.href}
+                onClick={() => window.scrollTo(0, 0)}
+                className="flex items-center p-4 rounded-lg bg-white border border-gray-100 shadow-sm hover:shadow-md transition-all duration-200"
+              >
+                <div className={`${service.color} p-3 rounded-full mr-4`}>
+                  <div className={service.textColor}>{service.icon}</div>
+                </div>
+                <span className="font-medium text-gray-800">{service.title}</span>
+              </Link>
+            ))}
           </div>
         </div>
       </section>

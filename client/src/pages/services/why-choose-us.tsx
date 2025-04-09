@@ -9,6 +9,9 @@ import {
   Star,
   CheckCircle,
   TrendingUp,
+  Building,
+  Key,
+  DollarSign,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
@@ -16,6 +19,56 @@ import Navbar from "@/components/layout/navbar";
 import Footer from "@/components/layout/footer";
 
 export default function WhyChooseUsPage() {
+  // Current page identifier
+  const currentPage = "why-choose-us";
+
+  // Service links data
+  const serviceLinks = [
+    {
+      id: "why-choose-us",
+      title: "Why Choose Us",
+      icon: <Shield className="h-5 w-5" />,
+      color: "bg-blue-100",
+      textColor: "text-blue-600",
+      href: "/services/why-choose-us",
+    },
+    {
+      id: "property-management",
+      title: "Property Management",
+      icon: <Building className="h-5 w-5" />,
+      color: "bg-green-100",
+      textColor: "text-green-600",
+      href: "/services/property-management",
+    },
+    {
+      id: "investment-advisory",
+      title: "Investment Advisory",
+      icon: <Key className="h-5 w-5" />,
+      color: "bg-purple-100",
+      textColor: "text-purple-600",
+      href: "/services/investment-advisory",
+    },
+    {
+      id: "legal-solutions",
+      title: "Legal Solutions",
+      icon: <Shield className="h-5 w-5" />,
+      color: "bg-indigo-100",
+      textColor: "text-indigo-600",
+      href: "/services/legal-solutions",
+    },
+    {
+      id: "financial-management",
+      title: "Financial Management",
+      icon: <DollarSign className="h-5 w-5" />,
+      color: "bg-teal-100",
+      textColor: "text-teal-600",
+      href: "/services/financial-management",
+    },
+  ];
+
+  // Filter out the current page from service links
+  const relatedServices = serviceLinks.filter(service => service.id !== currentPage);
+
   return (
     <div className="bg-white">
       <Navbar />
@@ -246,6 +299,31 @@ export default function WhyChooseUsPage() {
             <Button size="lg" variant="outline" asChild>
               <Link href="/services/legal-solutions">Explore Our Services</Link>
             </Button>
+          </div>
+        </div>
+      </section>
+
+      {/* Related Tools & Resources Section */}
+      <section className="py-10 bg-gray-50">
+        <div className="container mx-auto px-4">
+          <div className="mb-8">
+            <h2 className="text-2xl md:text-3xl font-bold text-gray-900">Related Tools & Resources</h2>
+          </div>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+            {relatedServices.map((service) => (
+              <Link 
+                key={service.id} 
+                href={service.href}
+                onClick={() => window.scrollTo(0, 0)}
+                className="flex items-center p-4 rounded-lg bg-white border border-gray-100 shadow-sm hover:shadow-md transition-all duration-200"
+              >
+                <div className={`${service.color} p-3 rounded-full mr-4`}>
+                  <div className={service.textColor}>{service.icon}</div>
+                </div>
+                <span className="font-medium text-gray-800">{service.title}</span>
+              </Link>
+            ))}
           </div>
         </div>
       </section>

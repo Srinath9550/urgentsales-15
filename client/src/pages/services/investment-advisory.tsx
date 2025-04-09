@@ -9,6 +9,8 @@ import {
   Building,
   Briefcase,
   MapPin,
+  Shield,
+  Key,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
@@ -27,9 +29,55 @@ export default function InvestmentAdvisoryPage() {
     }
   };
 
-  // Example prices for demonstration
-  const sampleInvestment = 5000000;
-  const projectedReturn = 7500000;
+  // Current page identifier
+  const currentPage = "investment-advisory";
+
+  // Service links data
+  const serviceLinks = [
+    {
+      id: "why-choose-us",
+      title: "Why Choose Us",
+      icon: <Shield className="h-5 w-5" />,
+      color: "bg-blue-100",
+      textColor: "text-blue-600",
+      href: "/services/why-choose-us",
+    },
+    {
+      id: "property-management",
+      title: "Property Management",
+      icon: <Building className="h-5 w-5" />,
+      color: "bg-green-100",
+      textColor: "text-green-600",
+      href: "/services/property-management",
+    },
+    {
+      id: "investment-advisory",
+      title: "Investment Advisory",
+      icon: <Key className="h-5 w-5" />,
+      color: "bg-purple-100",
+      textColor: "text-purple-600",
+      href: "/services/investment-advisory",
+    },
+    {
+      id: "legal-solutions",
+      title: "Legal Solutions",
+      icon: <Shield className="h-5 w-5" />,
+      color: "bg-indigo-100",
+      textColor: "text-indigo-600",
+      href: "/services/legal-solutions",
+    },
+    {
+      id: "financial-management",
+      title: "Financial Management",
+      icon: <DollarSign className="h-5 w-5" />,
+      color: "bg-teal-100",
+      textColor: "text-teal-600",
+      href: "/services/financial-management",
+    },
+  ];
+
+  // Filter out the current page from service links
+  const relatedServices = serviceLinks.filter(service => service.id !== currentPage);
 
   return (
     <div className="bg-white">
@@ -51,7 +99,7 @@ export default function InvestmentAdvisoryPage() {
               <div className="flex flex-wrap gap-4">
               <Button size="lg" asChild onClick={() => window.scrollTo(0, 0)}>
                   <Link href="/contact">
-                    <Phone className="mr-2 h-4 w-4" /> Contact an Advisor
+                    <Phone className="mr-2 h-4 w-4" /> Contact an Advisor
                   </Link>
                 </Button>
                 <Button variant="outline" size="lg" asChild onClick={() => window.scrollTo(0, 0)}>
@@ -70,37 +118,7 @@ export default function InvestmentAdvisoryPage() {
         </div>
       </section>
 
-      {/* Example section with prices */}
-      <section className="py-12 bg-white">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-10">
-            <h2 className="text-3xl font-bold">Investment Potential</h2>
-            <p className="text-gray-600 mt-2">
-              See how your investments can grow with our expert guidance
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="bg-gray-50 p-6 rounded-lg shadow">
-              <h3 className="text-xl font-semibold mb-4">Sample Investment</h3>
-              <p className="text-4xl font-bold text-primary">
-                {formatIndianPrice(sampleInvestment)}
-              </p>
-              <p className="text-gray-600 mt-2">Initial investment amount</p>
-            </div>
-
-            <div className="bg-gray-50 p-6 rounded-lg shadow">
-              <h3 className="text-xl font-semibold mb-4">Projected Returns</h3>
-              <p className="text-4xl font-bold text-green-600">
-                {formatIndianPrice(projectedReturn)}
-              </p>
-              <p className="text-gray-600 mt-2">
-                Estimated return after 5 years
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
+     
 
       {/* Rest of the content */}
       {/* Services Overview */}
@@ -155,103 +173,122 @@ export default function InvestmentAdvisoryPage() {
       </section>
 
       {/* Investment Process */}
-      <section className="py-16 bg-gray-50">
-        <div className="container mx-auto px-4">
-          <h2 className="text-3xl font-bold mb-12 text-center">
-            Our Investment Process
-          </h2>
+<section className="py-8 md:py-16 bg-gray-50">
+  <div className="container mx-auto px-4">
+    <h2 className="text-2xl md:text-3xl font-bold mb-8 md:mb-12 text-center">
+      Our Investment Process
+    </h2>
 
-          <div className="max-w-4xl mx-auto">
-            <div className="relative">
-              {/* Timeline */}
-              <div className="absolute left-0 md:left-1/2 h-full w-1 bg-purple-200 transform md:translate-x-0"></div>
-
-              {/* Steps */}
-              <div className="space-y-12">
-                <div className="relative flex flex-col md:flex-row items-center md:items-start">
-                  <div className="flex items-center justify-center w-10 h-10 rounded-full bg-purple-600 text-white md:absolute md:left-1/2 md:-ml-5 z-10">
-                    1
-                  </div>
-                  <div className="mt-4 md:mt-0 md:ml-16 md:w-1/2 md:pl-8">
-                    <h3 className="text-xl font-semibold mb-2">
-                      Initial Consultation
-                    </h3>
-                    <p className="text-gray-600">
-                      We begin by understanding your financial goals, investment
-                      timeline, and risk tolerance to create a personalized
-                      investment plan.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="relative flex flex-col md:flex-row items-center md:items-start">
-                  <div className="flex items-center justify-center w-10 h-10 rounded-full bg-purple-600 text-white md:absolute md:left-1/2 md:-ml-5 z-10">
-                    2
-                  </div>
-                  <div className="mt-4 md:mt-0 md:mr-16 md:w-1/2 md:text-right">
-                    <h3 className="text-xl font-semibold mb-2">
-                      Market Research
-                    </h3>
-                    <p className="text-gray-600">
-                      Our team conducts thorough market research to identify
-                      promising investment opportunities aligned with your
-                      objectives.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="relative flex flex-col md:flex-row items-center md:items-start">
-                  <div className="flex items-center justify-center w-10 h-10 rounded-full bg-purple-600 text-white md:absolute md:left-1/2 md:-ml-5 z-10">
-                    3
-                  </div>
-                  <div className="mt-4 md:mt-0 md:ml-16 md:w-1/2 md:pl-8">
-                    <h3 className="text-xl font-semibold mb-2">
-                      Strategy Development
-                    </h3>
-                    <p className="text-gray-600">
-                      We develop a comprehensive investment strategy tailored to
-                      your needs, including property selection, financing
-                      options, and risk management.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="relative flex flex-col md:flex-row items-center md:items-start">
-                  <div className="flex items-center justify-center w-10 h-10 rounded-full bg-purple-600 text-white md:absolute md:left-1/2 md:-ml-5 z-10">
-                    4
-                  </div>
-                  <div className="mt-4 md:mt-0 md:mr-16 md:w-1/2 md:text-right">
-                    <h3 className="text-xl font-semibold mb-2">
-                      Implementation
-                    </h3>
-                    <p className="text-gray-600">
-                      We assist you in executing the investment strategy, from
-                      property acquisition to portfolio management and
-                      optimization.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="relative flex flex-col md:flex-row items-center md:items-start">
-                  <div className="flex items-center justify-center w-10 h-10 rounded-full bg-purple-600 text-white md:absolute md:left-1/2 md:-ml-5 z-10">
-                    5
-                  </div>
-                  <div className="mt-4 md:mt-0 md:ml-16 md:w-1/2 md:pl-8">
-                    <h3 className="text-xl font-semibold mb-2">
-                      Monitoring & Optimization
-                    </h3>
-                    <p className="text-gray-600">
-                      We continuously monitor your investment performance and
-                      make strategic adjustments to optimize returns and adapt
-                      to changing market conditions.
-                    </p>
-                  </div>
-                </div>
+    <div className="max-w-4xl mx-auto">
+      {/* Mobile Timeline */}
+      <div className="md:hidden space-y-8">
+        {[
+          {
+            step: 1,
+            title: "Initial Consultation",
+            description: "We begin by understanding your financial goals, investment timeline, and risk tolerance to create a personalized investment plan."
+          },
+          {
+            step: 2,
+            title: "Market Research",
+            description: "Our team conducts thorough market research to identify promising investment opportunities aligned with your objectives."
+          },
+          {
+            step: 3,
+            title: "Strategy Development",
+            description: "We develop a comprehensive investment strategy tailored to your needs, including property selection, financing options, and risk management."
+          },
+          {
+            step: 4,
+            title: "Implementation",
+            description: "We assist you in executing the investment strategy, from property acquisition to portfolio management and optimization."
+          },
+          {
+            step: 5,
+            title: "Monitoring & Optimization",
+            description: "We continuously monitor your investment performance and make strategic adjustments to optimize returns and adapt to changing market conditions."
+          }
+        ].map((item, index) => (
+          <div key={index} className="bg-white rounded-lg p-6 shadow-sm">
+            <div className="flex items-center mb-4">
+              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-purple-600 text-white text-sm mr-4">
+                {item.step}
               </div>
+              <h3 className="text-lg font-semibold">{item.title}</h3>
+            </div>
+            <p className="text-gray-600">{item.description}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Desktop Timeline */}
+      <div className="hidden md:block relative">
+        <div className="absolute left-1/2 h-full w-1 bg-purple-200 transform -translate-x-1/2"></div>
+        <div className="space-y-12">
+          {/* Step 1 */}
+          <div className="relative flex items-center justify-between">
+            <div className="w-5/12 text-right pr-8">
+              <h3 className="text-xl font-semibold mb-2">Initial Consultation</h3>
+              <p className="text-gray-600">
+                We begin by understanding your financial goals, investment timeline, and risk tolerance to create a personalized investment plan.
+              </p>
+            </div>
+            <div className="absolute left-1/2 -translate-x-1/2 flex items-center justify-center w-10 h-10 rounded-full bg-purple-600 text-white z-10">1</div>
+            <div className="w-5/12"></div>
+          </div>
+
+          {/* Step 2 */}
+          <div className="relative flex items-center justify-between">
+            <div className="w-5/12"></div>
+            <div className="absolute left-1/2 -translate-x-1/2 flex items-center justify-center w-10 h-10 rounded-full bg-purple-600 text-white z-10">2</div>
+            <div className="w-5/12 pl-8">
+              <h3 className="text-xl font-semibold mb-2">Market Research</h3>
+              <p className="text-gray-600">
+                Our team conducts thorough market research to identify promising investment opportunities aligned with your objectives.
+              </p>
             </div>
           </div>
+
+          {/* Step 3 */}
+          <div className="relative flex items-center justify-between">
+            <div className="w-5/12 text-right pr-8">
+              <h3 className="text-xl font-semibold mb-2">Strategy Development</h3>
+              <p className="text-gray-600">
+                We develop a comprehensive investment strategy tailored to your needs, including property selection, financing options, and risk management.
+              </p>
+            </div>
+            <div className="absolute left-1/2 -translate-x-1/2 flex items-center justify-center w-10 h-10 rounded-full bg-purple-600 text-white z-10">3</div>
+            <div className="w-5/12"></div>
+          </div>
+
+          {/* Step 4 */}
+          <div className="relative flex items-center justify-between">
+            <div className="w-5/12"></div>
+            <div className="absolute left-1/2 -translate-x-1/2 flex items-center justify-center w-10 h-10 rounded-full bg-purple-600 text-white z-10">4</div>
+            <div className="w-5/12 pl-8">
+              <h3 className="text-xl font-semibold mb-2">Implementation</h3>
+              <p className="text-gray-600">
+                We assist you in executing the investment strategy, from property acquisition to portfolio management and optimization.
+              </p>
+            </div>
+          </div>
+
+          {/* Step 5 */}
+          <div className="relative flex items-center justify-between">
+            <div className="w-5/12 text-right pr-8">
+              <h3 className="text-xl font-semibold mb-2">Monitoring & Optimization</h3>
+              <p className="text-gray-600">
+                We continuously monitor your investment performance and make strategic adjustments to optimize returns and adapt to changing market conditions.
+              </p>
+            </div>
+            <div className="absolute left-1/2 -translate-x-1/2 flex items-center justify-center w-10 h-10 rounded-full bg-purple-600 text-white z-10">5</div>
+            <div className="w-5/12"></div>
+          </div>
         </div>
-      </section>
+      </div>
+    </div>
+  </div>
+</section>
 
       {/* Investment Types */}
       <section className="py-16">
@@ -396,6 +433,31 @@ export default function InvestmentAdvisoryPage() {
             <Button variant="outline" size="lg" asChild>
               <Link href="/services/legal-solutions">Explore Other Services</Link>
             </Button>
+          </div>
+        </div>
+      </section>
+
+      {/* Related Tools & Resources Section */}
+      <section className="py-10 bg-gray-50">
+        <div className="container mx-auto px-4">
+          <div className="mb-8">
+            <h2 className="text-2xl md:text-3xl font-bold text-gray-900">Related Tools & Resources</h2>
+          </div>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+            {relatedServices.map((service) => (
+              <Link 
+                key={service.id} 
+                href={service.href}
+                onClick={() => window.scrollTo(0, 0)}
+                className="flex items-center p-4 rounded-lg bg-white border border-gray-100 shadow-sm hover:shadow-md transition-all duration-200"
+              >
+                <div className={`${service.color} p-3 rounded-full mr-4`}>
+                  <div className={service.textColor}>{service.icon}</div>
+                </div>
+                <span className="font-medium text-gray-800">{service.title}</span>
+              </Link>
+            ))}
           </div>
         </div>
       </section>

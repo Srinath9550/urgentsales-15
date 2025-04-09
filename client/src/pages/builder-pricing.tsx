@@ -77,7 +77,7 @@ const BuilderPricingPlans = () => {
       numericPrice: 5999,
       discount: "25% OFF",
       gst: "+ 18% GST",
-      icon: <Rocket className="h-8 w-8 text-pink-600" />,
+      icon:<span className="text-2xl">🚀</span>,
       features: {
         adListings: 10,
         topUrgencyList: false,
@@ -95,8 +95,8 @@ const BuilderPricingPlans = () => {
         highImpactDisplay: "15 Days",
         validFor: "3 Months",
       },
-      color: "pink",
-      buttonColor: "bg-pink-600 hover:bg-pink-700 text-white",
+      color: "indigo",
+      buttonColor: "bg-indigo-600 hover:bg-indigo-700 text-white",
     },
     {
       id: "fasttrack",
@@ -235,7 +235,7 @@ const BuilderPricingPlans = () => {
                       <h3 className="font-bold">{plan.name}</h3>
                     </div>
                     {plan.discount && (
-                      <Badge className="bg-red-500">{plan.discount}</Badge>
+                      <Badge className="bg-green-500">{plan.discount}</Badge>
                     )}
                     {plan.name === "Elite Urgency Plan" && (
                       <Badge className="bg-yellow-500 ml-1">Best Value</Badge>
@@ -402,7 +402,7 @@ const BuilderPricingPlans = () => {
                         <div className="mb-1">{plan.icon}</div>
                         <span className="font-bold">{plan.name}</span>
                         {plan.discount && (
-                          <Badge className="bg-red-500 text-white my-2">{plan.discount}</Badge>
+                          <Badge className="bg-green-500 text-white my-2">{plan.discount}</Badge>
                         )}
                         <div className="mt-2">
                           {plan.originalPrice !== plan.price && (

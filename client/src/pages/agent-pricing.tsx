@@ -57,8 +57,8 @@ const AgentPricingPlans = () => {
         highImpactDisplay: "15 Days",
         validFor: "3 Months",
       },
-      color: "pink",
-      buttonColor: "bg-pink-600 hover:bg-pink-700 text-white",
+      color: "indigo",
+      buttonColor: "bg-indigo-600 hover:bg-indigo-700 text-white",
     },
     {
       name: "Prime Agent Plan",
@@ -179,7 +179,7 @@ const AgentPricingPlans = () => {
                   <span className="text-3xl mb-2">{plan.icon}</span>
                   <h2 className="text-xl font-bold">{plan.name}</h2>
                   {plan.discount && (
-                    <Badge className="bg-red-500 text-white my-2">{plan.discount}</Badge>
+                   <Badge className="bg-green-500">{plan.discount}</Badge>
                   )}
                   <div className="mt-2 text-center">
                     {plan.originalPrice !== plan.price && (
@@ -234,7 +234,7 @@ const AgentPricingPlans = () => {
                         <span className="text-2xl mb-1">{plan.icon}</span>
                         <span className="font-bold">{plan.name}</span>
                         {plan.discount && (
-                          <Badge className="bg-red-500 text-white my-1">{plan.discount}</Badge>
+                          <Badge className="bg-green-500 text-white my-2">{plan.discount}</Badge>
                         )}
                         <div className="mt-1">
                           {plan.originalPrice !== plan.price && (
@@ -281,31 +281,6 @@ const AgentPricingPlans = () => {
                 </tr>
               </tbody>
             </table>
-          </div>
-
-          {/* FAQ Section */}
-          <div className="max-w-3xl mx-auto mt-16 bg-white p-6 rounded-lg shadow-md border">
-            <h2 className="text-xl font-bold mb-4">Frequently Asked Questions</h2>
-            <div className="space-y-4">
-              <div>
-                <h3 className="font-medium">How do I upgrade my plan?</h3>
-                <p className="text-gray-600 mt-1">
-                  You can upgrade your plan at any time from your agent dashboard. The remaining value of your current plan will be prorated and applied to your new plan.
-                </p>
-              </div>
-              <div>
-                <h3 className="font-medium">What happens when my plan expires?</h3>
-                <p className="text-gray-600 mt-1">
-                  Your listings will remain visible but some premium features will be disabled. You'll receive notifications before your plan expires so you can renew it.
-                </p>
-              </div>
-              <div>
-                <h3 className="font-medium">Can I get a refund if I'm not satisfied?</h3>
-                <p className="text-gray-600 mt-1">
-                  We offer a 7-day money-back guarantee for all paid plans. If you're not satisfied, contact our support team within 7 days of purchase.
-                </p>
-              </div>
-            </div>
           </div>
         </div>
       </div>
