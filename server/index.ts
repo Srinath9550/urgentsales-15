@@ -6,7 +6,7 @@ import { initializeDatabase } from "./db";
 import { setupAuth } from "./auth";
 import { requestLoggerMiddleware } from "./logger-service";
 import path from "path";
-import fs from "fs";
+import fs from "fs-extra";
 // Add getAffordableProjects to the import
 import { sendEmail } from './db-storage'; 
 import { fileURLToPath } from "url";
@@ -34,7 +34,14 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-console.log('Database URL:', process.env.DATABASE_URL); // Add this line to verify the URL
+// Set NODE_ENV to development if not set
+if (!process.env.NODE_ENV) {
+  process.env.NODE_ENV = 'development';
+  console.log('NODE_ENV not set, defaulting to development mode');
+}
+
+console.log('Environment:', process.env.NODE_ENV);
+console.log('Database URL:', process.env.DATABASE_URL);
 
 const app = express();
 const port = process.env.PORT || 5000;
@@ -167,9 +174,9 @@ async function startServer(app: any, port: number, isProduction: boolean = false
 
     // Ensure "uploads" directory exists
     const uploadsDir = path.join(process.cwd(), "uploads");
-    if (!fs.existsSync(uploadsDir)) {
-      fs.mkdirSync(uploadsDir, { recursive: true });
-    }
+    // Use fs-extra's ensureDirSync instead of existsSync/mkdirSync
+    fs.ensureDirSync(uploadsDir);
+    console.log('Ensured uploads directory exists:', uploadsDir);
 
     // Serve static files from uploads directory
     app.use("/uploads", express.static(uploadsDir));

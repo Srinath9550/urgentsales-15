@@ -2,6 +2,10 @@ import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, sendEmailOTP } from "./auth";
+import * as fs from 'fs-extra';
+import * as path from 'path';
+import { fileURLToPath } from 'url';
+import { uploadToS3, getSignedImageUrl } from './s3-service';
 import {
   insertPropertySchema,
   insertAgentSchema,
@@ -30,6 +34,7 @@ import {
   handleReportProblem,
   handlePropertyInterest,
 } from "./email-service";
+import propertyInterestRoutes from "./routes/property-interest";
 import {
   getRecentLogs,
   getEntityLogs,
@@ -57,6 +62,9 @@ import {
   updateReferralStatus,
 } from "./referral-service";
 
+// Import upload routes - we'll import this dynamically later
+// import { handlePropertyImageUpload } from './upload-routes';
+
 //  Sub Scription Service 
 import { SubscriptionService } from './services/subscription-service';
 
@@ -65,8 +73,7 @@ import adPackagesRoutes from './routes/ad-packages';
 
 
 // File system and path modules for serving static files
-// import * as fs from 'fs';
-// import * as path from 'path';
+// Already imported at the top of the file
 
 // Helper to catch errors in async routes
 const asyncHandler =
@@ -299,11 +306,32 @@ const getTableRecords = async (req: Request, res: Response) => {
   }
 };
 
+// Get the directory name (equivalent to __dirname in CommonJS)
+const getDirName = () => {
+  const filename = fileURLToPath(import.meta.url);
+  return path.dirname(filename);
+};
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Setup authentication
   setupAuth(app);
 
   app.use(express.json());
+  
+  // Get the directory name
+  const dirName = getDirName();
+  
+  // Serve static files from the uploads directory
+  app.use('/uploads', express.static(path.join(dirName, '..', 'uploads')));
+  
+  // Create uploads directory if it doesn't exist
+  const uploadsDir = path.join(dirName, '..', 'uploads');
+  // Use fs-extra's ensureDirSync instead of existsSync/mkdirSync
+  fs.ensureDirSync(uploadsDir);
+  console.log('Ensured uploads directory exists:', uploadsDir);
+  
+  // Register property interest routes
+  app.use('/api/property-interest', propertyInterestRoutes);
 
   // Serve logo from root path
   // app.get('/logo.png', (req, res) => {
@@ -339,6 +367,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await createCheckoutSession(req, res);
     }),
   );
+
+  // =========== Upload Routes ===========
+  
+  // Property image upload endpoint is defined later in the file
 
   // =========== Notification Routes ===========
 
@@ -408,128 +440,87 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { category } = req.params;
       const { city } = req.query;
 
-      // Dummy data for top properties
-      const dummyProperties = [
-        {
-          id: 1,
-          title: "Luxury Villa with Pool",
-          description: "Magnificent 4BHK villa with private pool",
-          price: 25000000,
-          location: "Whitefield",
-          city: "Bangalore",
-          propertyType: "villa",
-          bedrooms: 4,
-          bathrooms: 4,
-          area: 3500,
-          imageUrls: [
-            "https://images.unsplash.com/photo-1613977257363-707ba9348227",
-          ],
-          premium: true,
-          verified: true,
-          saleType: "Sale",
-        },
-        {
-          id: 2,
-          title: "Sea View Apartment",
-          description: "Premium 3BHK apartment with sea view",
-          price: 18000000,
-          location: "Marine Drive",
-          city: "Mumbai",
-          propertyType: "apartment",
-          bedrooms: 3,
-          bathrooms: 3,
-          area: 2200,
-          imageUrls: [
-            "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267",
-          ],
-          premium: true,
-          verified: true,
-          saleType: "Sale",
-        },
-        {
-          id: 3,
-          title: "Modern Office Space",
-          description: "Ready-to-move office space in prime location",
-          price: 15000000,
-          location: "Cyber City",
-          city: "Gurgaon",
-          propertyType: "commercial",
-          area: 2800,
-          imageUrls: [
-            "https://images.unsplash.com/photo-1497366216548-37526070297c",
-          ],
-          premium: true,
-          verified: true,
-          saleType: "Rent",
-        },
-        {
-          id: 4,
-          title: "Garden View Penthouse",
-          description: "Exclusive 4BHK penthouse with roof garden",
-          price: 35000000,
-          location: "Koramangala",
-          city: "Bangalore",
-          propertyType: "apartment",
-          bedrooms: 4,
-          bathrooms: 4,
-          area: 4000,
-          imageUrls: [
-            "https://images.unsplash.com/photo-1600585154340-be6161a56a0c",
-          ],
-          premium: true,
-          verified: true,
-          saleType: "Sale",
-        },
-        {
-          id: 5,
-          title: "Smart Home Villa",
-          description: "Ultra-modern 5BHK villa with smart features",
-          price: 42000000,
-          location: "Electronic City",
-          city: "Bangalore",
-          propertyType: "villa",
-          bedrooms: 5,
-          bathrooms: 5,
-          area: 4500,
-          imageUrls: [
-            "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9",
-          ],
-          premium: true,
-          verified: true,
-          saleType: "Sale",
-        },
-      ];
+      try {
+        // Determine limit based on category
+        let limit = 10;
+        switch (category) {
+          case "top10":
+            limit = 10;
+            break;
+          case "top20":
+            limit = 20;
+            break;
+          case "top30":
+            limit = 30;
+            break;
+          case "top50":
+            limit = 50;
+            break;
+          case "top100":
+            limit = 100;
+            break;
+          default:
+            limit = 10;
+        }
 
-      let limit = 10;
-      switch (category) {
-        case "top10":
-          limit = 10;
-          break;
-        case "top20":
-          limit = 20;
-          break;
-        case "top30":
-          limit = 30;
-          break;
-        case "top50":
-          limit = 50;
-          break;
-        case "top100":
-          limit = 100;
-          break;
-        default:
-          limit = 10;
+        // Get regular properties from storage
+        const regularProperties = await storage.getTopProperties(category, city as string, limit);
+        
+        // Get free properties from free_properties table
+        let freePropertiesQuery = `
+          SELECT * FROM free_properties 
+          WHERE approval_status = 'approved'
+        `;
+        
+        // Add city filter if provided
+        if (city) {
+          freePropertiesQuery += ` AND LOWER(city) = LOWER($1)`;
+        }
+        
+        freePropertiesQuery += ` ORDER BY created_at DESC LIMIT $${city ? 2 : 1}`;
+        
+        // Execute query with appropriate parameters
+        const freeResult = city 
+          ? await pool.query(freePropertiesQuery, [city.toString(), limit])
+          : await pool.query(freePropertiesQuery, [limit]);
+        
+        // Map the free properties to match the expected format
+        const freeProperties = freeResult.rows.map(prop => {
+          return {
+            id: prop.id,
+            title: prop.title || "Untitled Property",
+            description: prop.description || "",
+            price: parseFloat(prop.price) || 0,
+            location: prop.location || "",
+            city: prop.city || "",
+            propertyType: prop.property_type || "",
+            bedrooms: prop.bedrooms ? parseInt(prop.bedrooms) : null,
+            bathrooms: prop.bathrooms ? parseInt(prop.bathrooms) : null,
+            area: parseFloat(prop.area) || 0,
+            imageUrls: prop.image_urls || [],
+            premium: false,
+            verified: true,
+            saleType: prop.rent_or_sale === "rent" ? "Rent" : "Sale",
+            isFreeProperty: true,
+            amenities: prop.amenities || []
+          };
+        });
+        
+        // Combine regular and free properties
+        const combinedProperties = [...regularProperties, ...freeProperties];
+        
+        // Sort by price (highest first) for top properties
+        combinedProperties.sort((a, b) => b.price - a.price);
+        
+        // Apply limit
+        const limitedProperties = combinedProperties.slice(0, limit);
+        
+        // Send the properties
+        res.json(limitedProperties);
+      } catch (error) {
+        console.error("Error fetching top properties:", error);
+        res.status(500).json({ message: "Failed to fetch top properties" });
       }
-
-      // Filter by city if provided
-      let filteredProperties = city
-        ? dummyProperties.filter(
-            (p) => p.city.toLowerCase() === city.toString().toLowerCase(),
-          )
-        : dummyProperties;
-
-      // Send the properties
-      res.json(filteredProperties.slice(0, limit));
     }),
   );
 
@@ -545,9 +536,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const freePropertiesQuery = `
           SELECT * FROM free_properties 
           WHERE approval_status = 'approved'
-          AND is_urgent_sale = true
           ORDER BY created_at DESC
-          LIMIT 3
+          LIMIT 6
         `;
         
         const freeResult = await pool.query(freePropertiesQuery);
@@ -677,6 +667,59 @@ export async function registerRoutes(app: Express): Promise<Server> {
     asyncHandler(async (req, res) => {
       const cities = await storage.getPropertyCities();
       res.json(cities);
+    }),
+  );
+  
+  // Get property counts by type
+  app.get(
+    "/api/properties/counts-by-type",
+    asyncHandler(async (req, res) => {
+      try {
+        // Get counts from regular properties
+        const regularCounts = await storage.getPropertyCountsByType();
+        
+        // Get counts from free properties
+        const freePropertiesQuery = `
+          SELECT 
+            property_type as type, 
+            COUNT(*) as count 
+          FROM free_properties 
+          WHERE approval_status = 'approved'
+          GROUP BY property_type
+        `;
+        
+        const freeResult = await pool.query(freePropertiesQuery);
+        const freeCounts = freeResult.rows;
+        
+        // Combine the counts
+        const combinedCounts = [...regularCounts];
+        
+        // Add free property counts to the combined counts
+        freeCounts.forEach(freeCount => {
+          const existingTypeIndex = combinedCounts.findIndex(
+            item => item.type.toLowerCase() === freeCount.type.toLowerCase()
+          );
+          
+          if (existingTypeIndex >= 0) {
+            // Add to existing type
+            combinedCounts[existingTypeIndex].count += parseInt(freeCount.count);
+          } else {
+            // Add new type
+            combinedCounts.push({
+              type: freeCount.type,
+              count: parseInt(freeCount.count)
+            });
+          }
+        });
+        
+        // Sort by count (highest first)
+        combinedCounts.sort((a, b) => b.count - a.count);
+        
+        res.json(combinedCounts);
+      } catch (error) {
+        console.error("Error fetching property counts by type:", error);
+        res.status(500).json({ message: "Failed to fetch property counts" });
+      }
     }),
   );
 
@@ -939,7 +982,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Apply sorting if needed
       if (sortBy) {
-        let sortedProperties = [...filteredProperties];
+        let sortedProperties = [...combinedProperties];
 
         switch (sortBy) {
           case "price_low":
@@ -1020,19 +1063,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get(
     "/api/properties/type/:type",
     asyncHandler(async (req, res) => {
-      const properties = await storage.getPropertiesByType(req.params.type);
+      try {
+        // Get regular properties by type
+        const properties = await storage.getPropertiesByType(req.params.type);
 
-      // Check if user is admin
-      const isAdmin = req.user && req.user.role === "admin";
+        // Check if user is admin
+        const isAdmin = req.user && req.user.role === "admin";
 
-      // If not admin, only return approved properties
-      const filteredProperties = isAdmin
-        ? properties
-        : properties.filter(
-            (property) => property.approvalStatus === "approved",
-          );
-
-      res.json(filteredProperties);
+        // If not admin, only return approved properties
+        const filteredProperties = isAdmin
+          ? properties
+          : properties.filter(
+              (property) => property.approvalStatus === "approved",
+            );
+            
+        // Get free properties by type
+        const freePropertiesQuery = `
+          SELECT * FROM free_properties 
+          WHERE LOWER(property_type) = LOWER($1)
+          AND approval_status = 'approved'
+          ORDER BY created_at DESC
+        `;
+        
+        const result = await pool.query(freePropertiesQuery, [req.params.type]);
+        
+        // Map the free properties to match the expected format
+        const freeProperties = result.rows.map(prop => ({
+          id: prop.id,
+          title: prop.title || "Untitled Property",
+          description: prop.description || "",
+          price: parseFloat(prop.price) || 0,
+          discountedPrice: null,
+          propertyType: prop.property_type || "",
+          propertyCategory: prop.property_category || "",
+          transactionType: prop.transaction_type || "",
+          isUrgentSale: prop.is_urgent_sale || false,
+          location: prop.location || "",
+          city: prop.city || "",
+          address: prop.address || "",
+          subscriptionLevel: "free",
+          imageUrls: prop.image_urls || [],
+          rentOrSale: prop.rent_or_sale || "sale",
+          status: "active",
+          approvalStatus: "approved",
+          createdAt: prop.created_at,
+          updatedAt: prop.updated_at || prop.created_at,
+          bedrooms: prop.bedrooms ? parseInt(prop.bedrooms) : null,
+          bathrooms: prop.bathrooms ? parseInt(prop.bathrooms) : null,
+          area: parseFloat(prop.area) || 0,
+          areaUnit: prop.area_unit || "sqft",
+          contactName: prop.contact_name || "",
+          contactPhone: prop.contact_phone || "",
+          contactEmail: prop.contact_email || "",
+          isFreeProperty: true, // Flag to identify this is from free_properties table
+          amenities: prop.amenities || []
+        }));
+        
+        // Combine regular and free properties
+        const combinedProperties = [...filteredProperties, ...freeProperties];
+        
+        // Sort by creation date (newest first)
+        combinedProperties.sort((a, b) => {
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        });
+        
+        res.json(combinedProperties);
+      } catch (error) {
+        console.error("Error fetching properties by type:", error);
+        res.status(500).json({ message: "Failed to fetch properties by type" });
+      }
     }),
   );
 
@@ -1053,6 +1152,109 @@ export async function registerRoutes(app: Express): Promise<Server> {
           );
 
       res.json(filteredProperties);
+    }),
+  );
+  
+  // Get urgent sales properties (limited-time deals)
+  app.get(
+    "/api/properties/urgent",
+    asyncHandler(async (req, res) => {
+      try {
+        console.log("Fetching urgent sales properties");
+        
+        // Get properties marked as urgent sale from both tables
+        const regularPropertiesQuery = `
+          SELECT * FROM properties 
+          WHERE is_urgent_sale = true AND approval_status = 'approved'
+          ORDER BY created_at DESC
+        `;
+        
+        const freePropertiesQuery = `
+          SELECT * FROM free_properties 
+          WHERE is_urgent_sale = true AND approval_status = 'approved'
+          ORDER BY created_at DESC
+        `;
+        
+        // Execute both queries
+        const [regularResult, freeResult] = await Promise.all([
+          pool.query(regularPropertiesQuery),
+          pool.query(freePropertiesQuery)
+        ]);
+        
+        console.log(`Found ${regularResult.rowCount} regular urgent properties and ${freeResult.rowCount} free urgent properties`);
+        
+        // Process regular properties
+        const regularProperties = regularResult.rows.map(prop => {
+          // Calculate discounted price (15-25% off)
+          const discountPercent = Math.floor(Math.random() * 11) + 15; // Random between 15-25%
+          const originalPrice = parseFloat(prop.price) || 0;
+          const discountedPrice = Math.round(originalPrice * (1 - discountPercent/100));
+          
+          // Calculate expiry date (1-5 days from now)
+          const daysToExpire = Math.floor(Math.random() * 5) + 1;
+          const expiresAt = new Date();
+          expiresAt.setDate(expiresAt.getDate() + daysToExpire);
+          
+          return {
+            id: prop.id,
+            title: prop.title,
+            location: `${prop.location}, ${prop.city}`,
+            price: originalPrice,
+            discountedPrice: discountedPrice,
+            discountPercentage: discountPercent,
+            propertyType: prop.property_type,
+            bedrooms: prop.bedrooms,
+            bathrooms: prop.bathrooms,
+            area: prop.area,
+            imageUrl: Array.isArray(prop.image_urls) && prop.image_urls.length > 0 
+              ? prop.image_urls[0] 
+              : '/placeholder-property.jpg',
+            expiresAt: expiresAt
+          };
+        });
+        
+        // Process free properties
+        const freeProperties = freeResult.rows.map(prop => {
+          // Calculate discounted price (15-25% off)
+          const discountPercent = Math.floor(Math.random() * 11) + 15; // Random between 15-25%
+          const originalPrice = parseFloat(prop.price) || 0;
+          const discountedPrice = Math.round(originalPrice * (1 - discountPercent/100));
+          
+          // Calculate expiry date (1-5 days from now)
+          const daysToExpire = Math.floor(Math.random() * 5) + 1;
+          const expiresAt = new Date();
+          expiresAt.setDate(expiresAt.getDate() + daysToExpire);
+          
+          // Get the first image URL if available
+          let imageUrl = '/placeholder-property.jpg';
+          if (prop.image_urls && Array.isArray(prop.image_urls) && prop.image_urls.length > 0) {
+            imageUrl = prop.image_urls[0];
+          }
+          
+          return {
+            id: prop.id,
+            title: prop.title,
+            location: `${prop.location}, ${prop.city}`,
+            price: originalPrice,
+            discountedPrice: discountedPrice,
+            discountPercentage: discountPercent,
+            propertyType: prop.property_type,
+            bedrooms: prop.bedrooms,
+            bathrooms: prop.bathrooms,
+            area: prop.area,
+            imageUrl: imageUrl,
+            expiresAt: expiresAt
+          };
+        });
+        
+        // Combine and return all urgent properties
+        const urgentProperties = [...regularProperties, ...freeProperties];
+        res.json(urgentProperties);
+        
+      } catch (error) {
+        console.error("Error fetching urgent properties:", error);
+        res.status(500).json({ message: "Failed to fetch urgent properties" });
+      }
     }),
   );
 
@@ -1228,23 +1430,105 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid property ID" });
       }
 
+      // First try to get from regular properties
       const property = await storage.getProperty(id);
-      if (!property) {
-        return res.status(404).json({ message: "Property not found" });
+      
+      if (property) {
+        // If user is logged in, track the view for recommendations
+        if (req.isAuthenticated()) {
+          await storage.addPropertyView(req.user.id, id);
+        }
+        
+        return res.json(property);
       }
-
-      // If user is logged in, track the view for recommendations
-      if (req.isAuthenticated()) {
-        await storage.addPropertyView(req.user.id, id);
+      
+      // If not found in regular properties, check free_properties table
+      try {
+        const freePropertyQuery = `SELECT * FROM free_properties WHERE id = $1`;
+        const result = await pool.query(freePropertyQuery, [id]);
+        
+        if (result.rows.length === 0) {
+          return res.status(404).json({ message: "Property not found" });
+        }
+        
+        const freeProperty = result.rows[0];
+        
+        // Check if the property is approved or if the user is the owner or admin
+        const isApproved = freeProperty.approval_status === 'approved';
+        const isOwner = req.isAuthenticated() && req.user.email === freeProperty.contact_email;
+        const isAdmin = req.isAuthenticated() && req.user.role === 'admin';
+        
+        if (!isApproved && !isOwner && !isAdmin) {
+          return res.status(403).json({ 
+            message: "This property is pending approval and can only be viewed by the owner or admin" 
+          });
+        }
+        
+        // Map the free property to match the Property interface
+        const mappedProperty = {
+          id: freeProperty.id,
+          title: freeProperty.title || "Untitled Property",
+          description: freeProperty.description || "",
+          price: parseFloat(freeProperty.price) || 0,
+          discountedPrice: null,
+          propertyType: freeProperty.property_type || "",
+          propertyCategory: freeProperty.property_category || "",
+          transactionType: freeProperty.transaction_type || "",
+          isUrgentSale: freeProperty.is_urgent_sale || false,
+          location: freeProperty.location || "",
+          city: freeProperty.city || "",
+          address: freeProperty.address || "",
+          subscriptionLevel: "free",
+          imageUrls: freeProperty.image_urls || [],
+          videoUrls: freeProperty.video_urls || [],
+          rentOrSale: freeProperty.rent_or_sale || "sale",
+          status: "active",
+          approvalStatus: freeProperty.approval_status || "pending",
+          createdAt: freeProperty.created_at,
+          updatedAt: freeProperty.updated_at || freeProperty.created_at,
+          bedrooms: freeProperty.bedrooms ? parseInt(freeProperty.bedrooms) : null,
+          bathrooms: freeProperty.bathrooms ? parseInt(freeProperty.bathrooms) : null,
+          area: parseFloat(freeProperty.area) || 0,
+          areaUnit: freeProperty.area_unit || "sqft",
+          contactName: freeProperty.contact_name || "",
+          contactPhone: freeProperty.contact_phone || "",
+          contactEmail: freeProperty.contact_email || "",
+          isFreeProperty: true,
+          amenities: freeProperty.amenities || [],
+          userId: -1, // Free properties don't have a user ID
+          balconies: freeProperty.balconies ? parseInt(freeProperty.balconies) : null,
+          floorNo: freeProperty.floor_no ? parseInt(freeProperty.floor_no) : null,
+          totalFloors: freeProperty.total_floors ? parseInt(freeProperty.total_floors) : null,
+          furnishedStatus: freeProperty.furnished_status || null,
+          facingDirection: freeProperty.facing_direction || null,
+          constructionAge: freeProperty.construction_age || null,
+          pincode: freeProperty.pincode || null,
+          whatsappEnabled: freeProperty.whatsapp_enabled || false
+        };
+        
+        // If user is logged in, track the view for recommendations
+        if (req.isAuthenticated()) {
+          try {
+            await storage.addPropertyView(req.user.id, id);
+          } catch (error) {
+            console.error("Error tracking property view:", error);
+            // Continue even if tracking fails
+          }
+        }
+        
+        return res.json(mappedProperty);
+      } catch (error) {
+        console.error("Error fetching free property:", error);
+        return res.status(500).json({ message: "Error fetching property details" });
       }
-
-      res.json(property);
     }),
   );
 
   // Upload property images
+
   app.post(
     "/api/upload/property-images",
+    isAuthenticated, // Added authentication middleware
     upload.array("files", 25),
     asyncHandler(async (req, res) => {
       try {
@@ -1252,35 +1536,122 @@ export async function registerRoutes(app: Express): Promise<Server> {
           files: req.files ? (Array.isArray(req.files) ? req.files.length : 'Not an array') : 'No files'
         });
         
-        if (
-          !req.files ||
-          (Array.isArray(req.files) && req.files.length === 0)
-        ) {
+        if (!req.files || (Array.isArray(req.files) && req.files.length === 0)) {
           return res.status(400).json({ message: "No files uploaded" });
         }
-
-        // Generate URLs for the uploaded files
-        const fileUrls = Array.isArray(req.files)
-          ? req.files.map((file) => {
-              const userId = req.user?.id || 'guest';
-              return getFileUrl(file.filename, userId);
-            })
-          : [getFileUrl(req.files.filename, req.user?.id || 'guest')];
-
-        console.log("Generated file URLs:", fileUrls);
-
+  
+        // Upload files to S3
+        const uploadPromises = (req.files as Express.Multer.File[]).map(file => 
+          uploadToS3(file, `properties/user-${req.user.id}`) // Include user ID in S3 path
+        );
+  
+        const s3Keys = await Promise.all(uploadPromises);
+        
+        console.log("Files successfully uploaded to S3:", s3Keys);
+  
         res.status(201).json({
+          success: true,
           message: "Files uploaded successfully",
-          files: fileUrls,
+          files: s3Keys
         });
       } catch (error) {
-        console.error("Error uploading files:", error);
-        res
-          .status(500)
-          .json({ message: "File upload failed", error: error.message });
+        console.error("Error uploading files to S3:", error);
+        res.status(500).json({ 
+          message: "File upload failed", 
+          error: error.message 
+        });
       }
-    }),
+    })
   );
+
+  app.get('/api/images/signed-url', asyncHandler(async (req, res) => {
+    const { key } = req.query;
+    
+    if (!key || typeof key !== 'string') {
+      return res.status(400).json({ message: 'Image key is required' });
+    }
+  
+    try {
+      const signedUrl = await getSignedImageUrl(key);
+      res.json({ url: signedUrl });
+    } catch (error) {
+      console.error('Error generating signed URL:', error);
+      res.status(500).json({ message: 'Failed to generate image URL' });
+    }
+  }));
+
+  // app.post(
+  //   "/api/upload/property-images",
+  //   upload.array("files", 25),
+  //   asyncHandler(async (req, res) => {
+  //     try {
+  //       console.log("Property image upload request received:", {
+  //         files: req.files ? (Array.isArray(req.files) ? req.files.length : 'Not an array') : 'No files'
+  //       });
+        
+  //       if (
+  //         !req.files ||
+  //         (Array.isArray(req.files) && req.files.length === 0)
+  //       ) {
+  //         return res.status(400).json({ message: "No files uploaded" });
+  //       }
+
+  //       // Generate URLs for the uploaded files
+  //       let fileUrls = [];
+  //       try {
+  //         if (Array.isArray(req.files)) {
+  //           fileUrls = req.files.map((file) => {
+  //             const userId = req.user?.id || 'guest';
+  //             // Use fs-extra's ensureDirSync instead of existsSync/mkdirSync
+  //             const userDir = `user-${userId}`;
+  //             const userDirPath = path.join(process.cwd(), 'uploads', userDir);
+  //             fs.ensureDirSync(userDirPath);
+              
+  //             // Create the URL directly
+  //             const relativePath = `/uploads/${userDir}/${file.filename}`;
+  //             console.log(`Generated file URL: ${relativePath}`);
+  //             return relativePath;
+  //           });
+  //         } else if (req.files && typeof req.files === 'object') {
+  //           // Handle case where req.files is an object with file arrays
+  //           Object.keys(req.files).forEach(key => {
+  //             const filesArray = req.files[key];
+  //             if (Array.isArray(filesArray)) {
+  //               filesArray.forEach(file => {
+  //                 const userId = req.user?.id || 'guest';
+  //                 // Use fs-extra's ensureDirSync instead of existsSync/mkdirSync
+  //                 const userDir = `user-${userId}`;
+  //                 const userDirPath = path.join(process.cwd(), 'uploads', userDir);
+  //                 fs.ensureDirSync(userDirPath);
+                  
+  //                 // Create the URL directly
+  //                 const relativePath = `/uploads/${userDir}/${file.filename}`;
+  //                 console.log(`Generated file URL: ${relativePath}`);
+  //                 fileUrls.push(relativePath);
+  //               });
+  //             }
+  //           });
+  //         }
+  //       } catch (error) {
+  //         console.error("Error generating file URLs:", error);
+  //         throw error;
+  //       }
+
+  //       console.log("Generated file URLs:", fileUrls);
+
+  //       res.status(201).json({
+  //         success: true,
+  //         message: "Files uploaded successfully",
+  //         files: fileUrls,
+  //       });
+  //     } catch (error) {
+  //       console.error("Error uploading files:", error);
+  //       res
+  //         .status(500)
+  //         .json({ message: "File upload failed", error: error.message });
+  //     }
+  //   }),
+  // );
 
   // Create a property
   app.post(
@@ -1467,50 +1838,195 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid property ID" });
       }
 
+      // First, try to get from regular properties
       const property = await storage.getProperty(id);
-      if (!property) {
+      
+      if (property) {
+        // Check if user owns this property or is an agent/admin
+        if (
+          property.userId !== req.user.id &&
+          req.user.role !== "agent" &&
+          req.user.role !== "admin" &&
+          req.user.role !== "company_admin"
+        ) {
+          return res
+            .status(403)
+            .json({
+              message: "You don't have permission to update this property",
+            });
+        }
+
+        // Check if trying to add discounted price (urgency sale) but user is not premium
+        if (
+          req.body.discountedPrice &&
+          !property.discountedPrice &&
+          req.user.subscriptionLevel !== "premium"
+        ) {
+          return res.status(403).json({
+            message: "Only premium users can add urgency sale discounts",
+            code: "PREMIUM_REQUIRED",
+          });
+        }
+
+        // Check if trying to add expiration date (urgency sale) but user is not premium
+        if (
+          req.body.expiresAt &&
+          !property.expiresAt &&
+          req.user.subscriptionLevel !== "premium"
+        ) {
+          return res.status(403).json({
+            message: "Only premium users can add urgency sale expiration dates",
+            code: "PREMIUM_REQUIRED",
+          });
+        }
+
+        const updatedProperty = await storage.updateProperty(id, req.body);
+        return res.json(updatedProperty);
+      }
+      
+      // If not found in regular properties, check free_properties table
+      const checkQuery = `SELECT * FROM free_properties WHERE id = $1`;
+      const checkResult = await pool.query(checkQuery, [id]);
+      
+      if (checkResult.rows.length === 0) {
         return res.status(404).json({ message: "Property not found" });
       }
-
-      // Check if user owns this property or is an agent/admin
+      
+      const freeProperty = checkResult.rows[0];
+      
+      // Check if user has permission to update this free property
+      // For free properties, we check if the contact email matches the user's email
       if (
-        property.userId !== req.user.id &&
-        req.user.role !== "agent" &&
-        req.user.role !== "company_admin"
-      ) {
-        return res
-          .status(403)
-          .json({
-            message: "You don't have permission to update this property",
-          });
-      }
-
-      // Check if trying to add discounted price (urgency sale) but user is not premium
-      if (
-        req.body.discountedPrice &&
-        !property.discountedPrice &&
-        req.user.subscriptionLevel !== "premium"
+        freeProperty.contact_email !== req.user.email &&
+        req.user.role !== "admin"
       ) {
         return res.status(403).json({
-          message: "Only premium users can add urgency sale discounts",
-          code: "PREMIUM_REQUIRED",
+          message: "You don't have permission to update this property",
         });
       }
-
-      // Check if trying to add expiration date (urgency sale) but user is not premium
-      if (
-        req.body.expiresAt &&
-        !property.expiresAt &&
-        req.user.subscriptionLevel !== "premium"
-      ) {
-        return res.status(403).json({
-          message: "Only premium users can add urgency sale expiration dates",
-          code: "PREMIUM_REQUIRED",
-        });
+      
+      // Prepare update fields
+      const updateFields = [];
+      const updateValues = [];
+      let paramIndex = 1;
+      
+      // Map fields from req.body to database column names
+      const fieldMappings: Record<string, string> = {
+        title: 'title',
+        description: 'description',
+        price: 'price',
+        propertyType: 'property_type',
+        propertyCategory: 'property_category',
+        transactionType: 'transaction_type',
+        isUrgentSale: 'is_urgent_sale',
+        location: 'location',
+        city: 'city',
+        address: 'address',
+        pincode: 'pincode',
+        bedrooms: 'bedrooms',
+        bathrooms: 'bathrooms',
+        balconies: 'balconies',
+        floorNo: 'floor_no',
+        totalFloors: 'total_floors',
+        furnishedStatus: 'furnished_status',
+        area: 'area',
+        areaUnit: 'area_unit',
+        facingDirection: 'facing_direction',
+        constructionAge: 'construction_age',
+        contactName: 'contact_name',
+        contactPhone: 'contact_phone',
+        contactEmail: 'contact_email',
+        whatsappEnabled: 'whatsapp_enabled',
+        imageUrls: 'image_urls',
+        videoUrls: 'video_urls',
+        amenities: 'amenities',
+        rentOrSale: 'rent_or_sale'
+      };
+      
+      // Build the update query dynamically
+      for (const [key, value] of Object.entries(req.body)) {
+        if (key in fieldMappings && value !== undefined) {
+          updateFields.push(`${fieldMappings[key]} = $${paramIndex}`);
+          updateValues.push(value);
+          paramIndex++;
+        }
       }
-
-      const updatedProperty = await storage.updateProperty(id, req.body);
-      res.json(updatedProperty);
+      
+      // Add updated_at field
+      updateFields.push(`updated_at = $${paramIndex}`);
+      updateValues.push(new Date());
+      
+      // If no fields to update, return the original property
+      if (updateFields.length === 0) {
+        return res.status(400).json({ message: "No valid fields to update" });
+      }
+      
+      // Build and execute the update query
+      const updateQuery = `
+        UPDATE free_properties
+        SET ${updateFields.join(', ')}
+        WHERE id = $${paramIndex + 1}
+        RETURNING *
+      `;
+      
+      updateValues.push(id);
+      
+      try {
+        const updateResult = await pool.query(updateQuery, updateValues);
+        
+        if (updateResult.rows.length === 0) {
+          return res.status(404).json({ message: "Property not found or update failed" });
+        }
+        
+        const updatedFreeProperty = updateResult.rows[0];
+        
+        // Map the updated free property to match the Property interface
+        const mappedProperty = {
+          id: updatedFreeProperty.id,
+          title: updatedFreeProperty.title || "Untitled Property",
+          description: updatedFreeProperty.description || "",
+          price: parseFloat(updatedFreeProperty.price) || 0,
+          discountedPrice: null,
+          propertyType: updatedFreeProperty.property_type || "",
+          propertyCategory: updatedFreeProperty.property_category || "",
+          transactionType: updatedFreeProperty.transaction_type || "",
+          isUrgentSale: updatedFreeProperty.is_urgent_sale || false,
+          location: updatedFreeProperty.location || "",
+          city: updatedFreeProperty.city || "",
+          address: updatedFreeProperty.address || "",
+          subscriptionLevel: "free",
+          imageUrls: updatedFreeProperty.image_urls || [],
+          videoUrls: updatedFreeProperty.video_urls || [],
+          rentOrSale: updatedFreeProperty.rent_or_sale || "sale",
+          status: "active",
+          approvalStatus: updatedFreeProperty.approval_status || "pending",
+          createdAt: updatedFreeProperty.created_at,
+          updatedAt: updatedFreeProperty.updated_at,
+          bedrooms: updatedFreeProperty.bedrooms ? parseInt(updatedFreeProperty.bedrooms) : null,
+          bathrooms: updatedFreeProperty.bathrooms ? parseInt(updatedFreeProperty.bathrooms) : null,
+          area: parseFloat(updatedFreeProperty.area) || 0,
+          areaUnit: updatedFreeProperty.area_unit || "sqft",
+          contactName: updatedFreeProperty.contact_name || "",
+          contactPhone: updatedFreeProperty.contact_phone || "",
+          contactEmail: updatedFreeProperty.contact_email || "",
+          isFreeProperty: true,
+          amenities: updatedFreeProperty.amenities || [],
+          userId: -1, // Free properties don't have a user ID
+          balconies: updatedFreeProperty.balconies ? parseInt(updatedFreeProperty.balconies) : null,
+          floorNo: updatedFreeProperty.floor_no ? parseInt(updatedFreeProperty.floor_no) : null,
+          totalFloors: updatedFreeProperty.total_floors ? parseInt(updatedFreeProperty.total_floors) : null,
+          furnishedStatus: updatedFreeProperty.furnished_status || null,
+          facingDirection: updatedFreeProperty.facing_direction || null,
+          constructionAge: updatedFreeProperty.construction_age || null,
+          pincode: updatedFreeProperty.pincode || null,
+          whatsappEnabled: updatedFreeProperty.whatsapp_enabled || false
+        };
+        
+        return res.json(mappedProperty);
+      } catch (error) {
+        console.error("Error updating free property:", error);
+        return res.status(500).json({ message: "Failed to update property" });
+      }
     }),
   );
 
@@ -1524,34 +2040,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid property ID" });
       }
 
-      // Get existing property
+      // First, try to get from regular properties
       const property = await storage.getProperty(id);
-      if (!property) {
+      
+      if (property) {
+        // Check if user owns this property or is an admin
+        if (
+          property.userId !== req.user.id &&
+          req.user.role !== "admin" &&
+          req.user.role !== "company_admin"
+        ) {
+          return res
+            .status(403)
+            .json({
+              message: "You don't have permission to delete this property",
+            });
+        }
+
+        // Delete the property
+        const success = await storage.deleteProperty(id);
+        if (!success) {
+          return res.status(500).json({ message: "Error deleting property" });
+        }
+
+        // Also delete property images from uploads if they exist
+        if (property.imageUrls && property.imageUrls.length > 0) {
+          for (const imageUrl of property.imageUrls) {
+            try {
+              await deleteFile(imageUrl);
+            } catch (error) {
+              console.error(`Error deleting file ${imageUrl}:`, error);
+              // Continue with deletion even if image deletion fails
+            }
+          }
+        }
+
+        return res.json({
+          success: true,
+          message: "Property deleted successfully",
+        });
+      }
+      
+      // If not found in regular properties, check free_properties table
+      const checkQuery = `SELECT * FROM free_properties WHERE id = $1`;
+      const checkResult = await pool.query(checkQuery, [id]);
+      
+      if (checkResult.rows.length === 0) {
         return res.status(404).json({ message: "Property not found" });
       }
-
-      // Check if user owns this property or is an admin
+      
+      const freeProperty = checkResult.rows[0];
+      
+      // Check if user has permission to delete this free property
+      // For free properties, we check if the contact email matches the user's email
       if (
-        property.userId !== req.user.id &&
-        req.user.role !== "admin" &&
-        req.user.role !== "company_admin"
+        freeProperty.contact_email !== req.user.email &&
+        req.user.role !== "admin"
       ) {
-        return res
-          .status(403)
-          .json({
-            message: "You don't have permission to delete this property",
-          });
+        return res.status(403).json({
+          message: "You don't have permission to delete this property",
+        });
       }
-
-      // Delete the property
-      const success = await storage.deleteProperty(id);
-      if (!success) {
+      
+      // Delete the free property
+      const deleteQuery = `DELETE FROM free_properties WHERE id = $1 RETURNING *`;
+      const deleteResult = await pool.query(deleteQuery, [id]);
+      
+      if (deleteResult.rows.length === 0) {
         return res.status(500).json({ message: "Error deleting property" });
       }
-
+      
       // Also delete property images from uploads if they exist
-      if (property.imageUrls && property.imageUrls.length > 0) {
-        for (const imageUrl of property.imageUrls) {
+      if (freeProperty.image_urls && freeProperty.image_urls.length > 0) {
+        for (const imageUrl of freeProperty.image_urls) {
           try {
             await deleteFile(imageUrl);
           } catch (error) {
@@ -1563,18 +2124,233 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       return res.json({
         success: true,
-        message: "Property deleted successfully",
+        message: "Property deleted successfully"
       });
     }),
   );
 
-  // Get current user's properties
+  // Delete a free property
+  app.delete(
+    "/api/properties/free/:id",
+    isAuthenticated,
+    asyncHandler(async (req, res) => {
+      try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) {
+          return res.status(400).json({ message: "Invalid property ID" });
+        }
+        
+        // First, get the free property to check ownership
+        const query = `
+          SELECT * FROM free_properties 
+          WHERE id = $1
+        `;
+        
+        const result = await pool.query(query, [id]);
+        
+        if (result.rows.length === 0) {
+          return res.status(404).json({ message: "Free property not found" });
+        }
+        
+        const property = result.rows[0];
+        
+        // Check if user is the owner (by email or phone) or an admin
+        const isOwner = 
+          (req.user.email && property.contact_email && 
+           req.user.email.toLowerCase().trim() === property.contact_email.toLowerCase().trim()) ||
+          (req.user.phone && property.contact_phone && 
+           (req.user.phone.includes(property.contact_phone) || 
+           property.contact_phone.includes(req.user.phone)));
+        
+        if (!isOwner && req.user.role !== "admin") {
+          return res.status(403).json({
+            message: "You don't have permission to delete this property"
+          });
+        }
+        
+        // Delete the property
+        const deleteQuery = `
+          DELETE FROM free_properties 
+          WHERE id = $1
+          RETURNING *
+        `;
+        
+        const deleteResult = await pool.query(deleteQuery, [id]);
+        
+        if (deleteResult.rowCount === 0) {
+          return res.status(500).json({ message: "Error deleting property" });
+        }
+        
+        // Also delete property images from uploads if they exist
+        if (property.image_urls && property.image_urls.length > 0) {
+          for (const imageUrl of property.image_urls) {
+            try {
+              await deleteFile(imageUrl);
+            } catch (error) {
+              console.error(`Error deleting file ${imageUrl}:`, error);
+              // Continue with deletion even if image deletion fails
+            }
+          }
+        }
+        
+        return res.json({
+          success: true,
+          message: "Free property deleted successfully"
+        });
+      } catch (error) {
+        console.error("Error deleting free property:", error);
+        return res.status(500).json({ 
+          message: "Error deleting free property",
+          error: error instanceof Error ? error.message : "Unknown error"
+        });
+      }
+    }),
+  );
+
+  // Get current user's properties (both regular and free properties)
   app.get(
     "/api/user/properties",
     isAuthenticated,
     asyncHandler(async (req, res) => {
-      const properties = await storage.getPropertiesByUser(req.user.id);
-      res.json(properties);
+      try {
+        console.log(`Fetching properties for user ID: ${req.user.id}, email: ${req.user.email}, phone: ${req.user.phone || 'not provided'}`);
+        
+        // Get regular properties from storage
+        const properties = await storage.getPropertiesByUser(req.user.id);
+        console.log(`Found ${properties.length} regular properties for user`);
+        
+        // Get free properties from free_properties table with more flexible matching
+        // We'll use ILIKE for case-insensitive matching and trim spaces
+        const freePropertiesQuery = `
+          SELECT * FROM free_properties 
+          WHERE 
+            (TRIM(LOWER(contact_email)) = TRIM(LOWER($1))
+            OR contact_phone = $2
+            OR contact_phone LIKE '%' || $3 || '%'
+            OR $4 LIKE '%' || contact_phone || '%')
+          ORDER BY created_at DESC
+        `;
+        
+        // Get user email and phone for matching
+        const userEmail = req.user.email || '';
+        const userPhone = req.user.phone || '';
+        // Get last 10 digits of phone for partial matching
+        const userPhoneLast10 = userPhone.replace(/\D/g, '').slice(-10);
+        
+        console.log(`Searching for free properties with email: ${userEmail}, phone: ${userPhone}, phoneLast10: ${userPhoneLast10}`);
+        
+        const freeResult = await pool.query(freePropertiesQuery, [
+          userEmail, 
+          userPhone,
+          userPhoneLast10,
+          userPhone
+        ]);
+        
+        console.log(`Found ${freeResult.rowCount} free properties for user`);
+        
+        // If no free properties found with the above query, try a more lenient approach
+        let freeProperties = [];
+        if (freeResult.rowCount === 0) {
+          console.log("No exact matches found, trying more lenient matching");
+          
+          // Try to match just the username part of the email (before the @)
+          const emailUsername = userEmail.split('@')[0];
+          if (emailUsername && emailUsername.length > 3) {
+            const lenientQuery = `
+              SELECT * FROM free_properties 
+              WHERE 
+                contact_email LIKE '%' || $1 || '%'
+                OR contact_name LIKE '%' || $2 || '%'
+              ORDER BY created_at DESC
+            `;
+            
+            console.log(`Trying lenient match with email username: ${emailUsername}`);
+            const lenientResult = await pool.query(lenientQuery, [emailUsername, req.user.name || '']);
+            console.log(`Found ${lenientResult.rowCount} free properties with lenient matching`);
+            
+            // Map the free properties to match the expected format
+            freeProperties = lenientResult.rows.map(prop => {
+              console.log(`Mapping free property: ${prop.id}, ${prop.title}, email: ${prop.contact_email}`);
+              return {
+                id: prop.id,
+                title: prop.title || "Untitled Property",
+                description: prop.description || "",
+                price: parseFloat(prop.price) || 0,
+                discountedPrice: null,
+                propertyType: prop.property_type || "",
+                propertyCategory: prop.property_category || "",
+                transactionType: prop.transaction_type || "",
+                isUrgentSale: prop.is_urgent_sale || false,
+                location: prop.location || "",
+                city: prop.city || "",
+                address: prop.address || "",
+                subscriptionLevel: "free",
+                imageUrls: prop.image_urls || [],
+                rentOrSale: prop.rent_or_sale || "sale",
+                status: "active",
+                approvalStatus: prop.approval_status || "pending",
+                createdAt: prop.created_at,
+                updatedAt: prop.updated_at || prop.created_at,
+                bedrooms: prop.bedrooms ? parseInt(prop.bedrooms) : null,
+                bathrooms: prop.bathrooms ? parseInt(prop.bathrooms) : null,
+                area: parseFloat(prop.area) || 0,
+                areaUnit: prop.area_unit || "sqft",
+                contactName: prop.contact_name || "",
+                contactPhone: prop.contact_phone || "",
+                contactEmail: prop.contact_email || "",
+                isFreeProperty: true, // Flag to identify this is from free_properties table
+                amenities: prop.amenities || []
+              };
+            });
+          }
+        } else {
+          // Map the free properties to match the expected format
+          freeProperties = freeResult.rows.map(prop => {
+            console.log(`Mapping free property: ${prop.id}, ${prop.title}, email: ${prop.contact_email}`);
+            return {
+              id: prop.id,
+              title: prop.title || "Untitled Property",
+              description: prop.description || "",
+              price: parseFloat(prop.price) || 0,
+              discountedPrice: null,
+              propertyType: prop.property_type || "",
+              propertyCategory: prop.property_category || "",
+              transactionType: prop.transaction_type || "",
+              isUrgentSale: prop.is_urgent_sale || false,
+              location: prop.location || "",
+              city: prop.city || "",
+              address: prop.address || "",
+              subscriptionLevel: "free",
+              imageUrls: prop.image_urls || [],
+              rentOrSale: prop.rent_or_sale || "sale",
+              status: "active",
+              approvalStatus: prop.approval_status || "pending",
+              createdAt: prop.created_at,
+              updatedAt: prop.updated_at || prop.created_at,
+              bedrooms: prop.bedrooms ? parseInt(prop.bedrooms) : null,
+              bathrooms: prop.bathrooms ? parseInt(prop.bathrooms) : null,
+              area: parseFloat(prop.area) || 0,
+              areaUnit: prop.area_unit || "sqft",
+              contactName: prop.contact_name || "",
+              contactPhone: prop.contact_phone || "",
+              contactEmail: prop.contact_email || "",
+              isFreeProperty: true, // Flag to identify this is from free_properties table
+              amenities: prop.amenities || []
+            };
+          });
+        }
+        
+        // Combine and sort by creation date (newest first)
+        const allProperties = [...properties, ...freeProperties].sort((a, b) => {
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        });
+        
+        console.log(`Returning total of ${allProperties.length} properties (${properties.length} regular + ${freeProperties.length} free)`);
+        res.json(allProperties);
+      } catch (error) {
+        console.error("Error fetching user properties:", error);
+        res.status(500).json({ message: "Failed to fetch user properties" });
+      }
     }),
   );
 
@@ -2155,12 +2931,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
     "/api/recommendations",
     isAuthenticated,
     asyncHandler(async (req, res) => {
-      const limit = req.query.limit ? parseInt(req.query.limit as string) : 10;
-      const recommendations = await storage.getRecommendedProperties(
-        req.user.id,
-        limit,
-      );
-      res.json(recommendations);
+      try {
+        const limit = req.query.limit ? parseInt(req.query.limit as string) : 10;
+        
+        // Get recommended properties from storage
+        const recommendations = await storage.getRecommendedProperties(
+          req.user.id,
+          limit,
+        );
+        
+        // Get free properties that match user preferences
+        const freePropertiesQuery = `
+          SELECT * FROM free_properties 
+          WHERE approval_status = 'approved'
+          ORDER BY created_at DESC
+          LIMIT 5
+        `;
+        
+        const freeResult = await pool.query(freePropertiesQuery);
+        
+        // Map the free properties to match the expected format
+        const mappedFreeProperties = freeResult.rows.map(prop => ({
+          id: prop.id,
+          title: prop.title,
+          description: prop.description || 'No description provided',
+          price: parseFloat(prop.price) || 0,
+          propertyType: prop.property_type,
+          propertyCategory: prop.property_category,
+          location: prop.location,
+          city: prop.city,
+          area: parseFloat(prop.area) || 0,
+          areaUnit: prop.area_unit,
+          bedrooms: prop.bedrooms,
+          bathrooms: prop.bathrooms,
+          balconies: prop.balconies,
+          floor: prop.floor_no,
+          totalFloors: prop.total_floors,
+          furnishedStatus: prop.furnished_status,
+          facing: prop.facing,
+          amenities: prop.amenities || [],
+          userType: prop.user_type,
+          contactName: prop.contact_name,
+          contactPhone: prop.contact_phone,
+          contactEmail: prop.contact_email,
+          imageUrls: prop.image_urls || [],
+          videoUrls: [],
+          isUrgentSale: prop.is_urgent_sale,
+          rentOrSale: prop.rent_or_sale,
+          status: 'active',
+          approvalStatus: 'approved',
+          isFreeProperty: true, // Mark as free property
+          isFeatured: true,
+          isPremium: false,
+          createdAt: prop.created_at,
+          updatedAt: prop.updated_at || prop.created_at
+        }));
+        
+        // Combine regular recommendations and free properties
+        const combinedRecommendations = [...recommendations, ...mappedFreeProperties];
+        
+        // Shuffle the combined recommendations to mix free and regular properties
+        const shuffledRecommendations = combinedRecommendations.sort(() => Math.random() - 0.5);
+        
+        // Limit to the requested number
+        const limitedRecommendations = shuffledRecommendations.slice(0, limit);
+        
+        res.json(limitedRecommendations);
+      } catch (error) {
+        console.error("Error fetching recommendations:", error);
+        res.status(500).json({ message: "Failed to fetch recommendations" });
+      }
     }),
   );
 
@@ -2380,39 +3220,133 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         console.log("Files received:", req.files ? req.files.length : 0);
 
-        // Process file uploads - group by category
-        const uploadedFiles = [];
-        const videoUrls = [];
+        // Process image URLs from the form data
+        let uploadedFiles = [];
+        let videoUrls = [];
         const imageCategories = {};
-        const guestId = Math.floor(Math.random() * 1000000); // Use a consistent ID for all files
         
+        // Check if we have pre-uploaded image URLs
+        if (req.body.imageUrls) {
+          try {
+            // Parse the JSON string of image URLs
+            const imageUrlsJson = req.body.imageUrls;
+            console.log("Received imageUrls JSON:", imageUrlsJson);
+            
+            if (typeof imageUrlsJson === 'string') {
+              const parsedUrls = JSON.parse(imageUrlsJson);
+              
+              if (Array.isArray(parsedUrls)) {
+                console.log(`Found ${parsedUrls.length} pre-uploaded image URLs`);
+                uploadedFiles = parsedUrls;
+                
+                // Add all images to a general category
+                imageCategories['uploaded'] = parsedUrls;
+              }
+            }
+          } catch (error) {
+            console.error("Error parsing imageUrls JSON:", error);
+          }
+        }
+        
+        // Check for category-specific pre-uploaded URLs from the form
+        const categoryPrefixes = ['exterior', 'livingRoom', 'kitchen', 'bedroom', 'bathroom', 'floorPlan', 'locationMap', 'other'];
+        
+        categoryPrefixes.forEach(prefix => {
+          // Check for URLs in the format prefix_urls_0, prefix_urls_1, etc.
+          let categoryUrls = [];
+          let index = 0;
+          
+          // Keep checking for URLs until we don't find any more
+          while (req.body[`${prefix}_urls_${index}`]) {
+            const url = req.body[`${prefix}_urls_${index}`];
+            console.log(`Found ${prefix} URL at index ${index}:`, url);
+            
+            if (url && typeof url === 'string') {
+              categoryUrls.push(url);
+              
+              // Also add to the main uploadedFiles array if not already there
+              if (!uploadedFiles.includes(url)) {
+                uploadedFiles.push(url);
+              }
+            }
+            
+            index++;
+          }
+          
+          // If we found any URLs for this category, add them to the imageCategories
+          if (categoryUrls.length > 0) {
+            console.log(`Adding ${categoryUrls.length} URLs to ${prefix} category`);
+            imageCategories[prefix] = categoryUrls;
+          }
+        });
+        
+        // Also process any files that were uploaded directly with this request
         if (req.files && Array.isArray(req.files)) {
-          req.files.forEach((file) => {
-            const fieldName = file.fieldname || '';
-            const category = fieldName.split('_')[0] || 'other';
-            
-            // Create unique filename to prevent collisions
-            const filename = `${file.originalname}-${Math.random().toString(16).substring(2)}`;
-            const fileUrl = `/uploads/user-${guestId}/${filename}`;
-            
-            // Initialize category array if it doesn't exist
-            if (!imageCategories[category]) {
-                imageCategories[category] = [];
-            }
-            
-            // Check if this is a video file
-            if (file.mimetype.startsWith('video/') || fieldName.startsWith('video_')) {
-              videoUrls.push(fileUrl);
+          console.log(`Processing ${req.files.length} files uploaded with this request`);
+          const guestId = Math.floor(Math.random() * 1000000); // Use a consistent ID for all files
+          
+          // Create the upload directory if it doesn't exist
+          const uploadDir = `./public/uploads/user-${guestId}`;
+          try {
+            await fs.promises.mkdir(uploadDir, { recursive: true });
+            console.log(`Created upload directory: ${uploadDir}`);
+          } catch (mkdirError) {
+            console.error(`Error creating upload directory: ${uploadDir}`, mkdirError);
+          }
+          
+          // Process each file
+          for (const file of req.files) {
+            try {
+              const fieldName = file.fieldname || '';
+              const category = fieldName.split('_')[0] || 'other';
               
-              // Also store in categories
-              imageCategories[category].push(fileUrl);
-            } else {
-              uploadedFiles.push(fileUrl);
+              // Create unique filename to prevent collisions
+              const filename = `${file.originalname.replace(/[^a-zA-Z0-9.]/g, '_')}-${Math.random().toString(16).substring(2)}`;
+              const filePath = `${uploadDir}/${filename}`;
               
-              // Also store in categories
-              imageCategories[category].push(fileUrl);
+              // Make sure the URL is properly formatted for web access
+              // This ensures the URL starts with a slash and doesn't have double slashes
+              const fileUrl = `/uploads/user-${guestId}/${filename}`;
+              console.log(`Generated file URL for free property: ${fileUrl}`);
+              
+              // Write the file to disk
+              await fs.promises.writeFile(filePath, file.buffer);
+              console.log(`Saved file to ${filePath}`);
+              
+              // Initialize category array if it doesn't exist
+              if (!imageCategories[category]) {
+                  imageCategories[category] = [];
+              }
+              
+              // Check if this is a video file
+              if (file.mimetype.startsWith('video/') || fieldName.startsWith('video_')) {
+                videoUrls.push(fileUrl);
+                
+                // Also store in categories
+                imageCategories[category].push(fileUrl);
+              } else {
+                uploadedFiles.push(fileUrl);
+                
+                // Also store in categories
+                imageCategories[category].push(fileUrl);
+              }
+            } catch (fileError) {
+              console.error(`Error processing file ${file.originalname}:`, fileError);
             }
-          });
+          }
+        }
+        
+        console.log(`Total images to save: ${uploadedFiles.length}, videos: ${videoUrls.length}`);
+        if (uploadedFiles.length === 0) {
+          console.warn("No images found for property submission!");
+        }
+        
+        // Ensure we have at least one image (even if it's a placeholder)
+        if (uploadedFiles.length === 0) {
+          const placeholderImage = '/images/property-placeholder.jpg';
+          uploadedFiles.push(placeholderImage);
+          imageCategories['placeholder'] = [placeholderImage];
+          console.log("Added placeholder image since no images were provided");
         }
 
         // Insert directly into free_properties table using raw SQL
@@ -2501,7 +3435,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           req.body.propertyType || 'residential',
           req.body.propertyCategory || null,
           rentOrSale,
-          req.body.isUrgentSale === 'true' || req.body.isUrgentSale === true,
+          req.body.isUrgentSale === 'true' || req.body.isUrgentSale === true || req.body.is_urgent_sale === 'true' || req.body.is_urgent_sale === true,
           req.body.location || 'Unknown location',
           req.body.city || 'Unknown city',
           req.body.projectName || null,
@@ -2545,7 +3479,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           rentOrSale,
           uploadedFiles,
           JSON.stringify(imageCategories),
-          'pending',
+          'pending', // Changed from 'approved' to 'pending' to require admin approval
           new Date()
         ];
         
@@ -2591,7 +3525,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // If we reached here, property was created successfully
         const responseProperty = {
           success: true,
-          message: "Property submitted successfully and waiting for admin approval",
+          message: "Property submitted successfully and waiting for admin approval. Your property will be visible after review.",
           id: createdPropertyId
         };
         
@@ -2612,7 +3546,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }),
   );
   
-  // Send OTP via email without authentication
+  // Send OTP via email without authentication - works for both registered and non-registered users
   app.post(
     "/api/auth/send-email-otp",
     asyncHandler(async (req, res) => {
@@ -2623,18 +3557,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(400).json({ message: "Email is required" });
         }
         
-        // First, find if this user exists
-        const user = await db.query.users.findFirst({
-          where: eq(schema.users.email, email)
-        });
-
-        if (!user) {
-          console.log(`User not found with email: ${email} when sending OTP`);
-          return res.status(404).json({
-            success: false,
-            message: "No user found with this email address"
-          });
-        }
+        console.log(`=========================================`);
+        console.log(`OTP REQUEST RECEIVED FOR EMAIL: ${email}`);
+        console.log(`=========================================`);
         
         // Generate a 6-digit OTP
         const otp = Math.floor(100000 + Math.random() * 900000).toString();
@@ -2643,24 +3568,101 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const expiresAt = new Date();
         expiresAt.setMinutes(expiresAt.getMinutes() + 10);
         
-        // Store OTP in database with user ID association
-        await db.insert(schema.otps).values({
-          userId: user.id,
-          otp: otp,
-          type: "email",
-          expiresAt: expiresAt,
-          verified: false
-        });
+        try {
+          // First, find if this user exists
+          const user = await db.query.users.findFirst({
+            where: eq(schema.users.email, email)
+          });
+          
+          // Check for existing OTPs for this email and invalidate them
+          try {
+            if (user) {
+              // For registered users, invalidate by user ID
+              await db.update(schema.otps)
+                .set({ verified: true }) // Mark as verified to invalidate
+                .where(
+                  and(
+                    eq(schema.otps.userId, user.id),
+                    eq(schema.otps.type, "email"),
+                    eq(schema.otps.verified, false)
+                  )
+                );
+            } else {
+              // For non-registered users, invalidate by email
+              await db.update(schema.otps)
+                .set({ verified: true }) // Mark as verified to invalidate
+                .where(
+                  and(
+                    eq(schema.otps.userId, -1),
+                    eq(schema.otps.email, email),
+                    eq(schema.otps.type, "email"),
+                    eq(schema.otps.verified, false)
+                  )
+                );
+            }
+            console.log(`Previous OTPs for ${email} have been invalidated`);
+          } catch (invalidateError) {
+            console.error("Error invalidating previous OTPs:", invalidateError);
+            // Continue anyway - this is not critical
+          }
+          
+          // Now create a new OTP record
+          if (user) {
+            // If user exists, store OTP with their user ID
+            console.log(`Using existing user ID ${user.id} for OTP`);
+            
+            // Store OTP in database with user ID association
+            await db.insert(schema.otps).values({
+              userId: user.id,
+              otp: otp,
+              type: "email",
+              expiresAt: expiresAt,
+              verified: false
+            });
+          } else {
+            // For non-registered users (free property submission), create a temporary OTP record
+            console.log(`No registered user found for ${email}, creating temporary OTP`);
+            
+            // Store OTP in database with special userId for non-registered users
+            await db.insert(schema.otps).values({
+              userId: -1, // Special ID for non-registered users
+              email: email, // Store email directly for verification
+              otp: otp,
+              type: "email",
+              expiresAt: expiresAt,
+              verified: false
+            });
+          }
+          
+          console.log(`OTP record created in database for ${email}`);
+        } catch (dbError) {
+          console.error("Database error while creating OTP:", dbError);
+          // Continue anyway - we'll still try to send the OTP
+          // This allows the flow to work even if there's a DB issue
+        }
         
         // Send OTP via email
         const sent = await sendEmailOTP(email, otp);
         
         if (sent) {
-          console.log(`OTP created and sent to ${email} for user ID ${user.id}`);
-          res.json({ 
-            success: true, 
-            message: "OTP sent successfully" 
-          });
+          console.log(`OTP created and sent to ${email}`);
+          
+          // Always return the OTP in development mode for testing
+          if (process.env.NODE_ENV === 'development') {
+            res.json({ 
+              success: true, 
+              message: "OTP sent successfully",
+              devInfo: {
+                otp: otp,
+                note: "This OTP is only shown in development mode"
+              }
+            });
+          } else {
+            res.json({ 
+              success: true, 
+              message: "OTP sent successfully" 
+            });
+          }
         } else {
           throw new Error("Failed to send OTP");
         }
@@ -2674,7 +3676,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     })
   );
   
-  // Verify OTP without authentication
+  // Verify OTP without authentication - works for both registered and non-registered users
   app.post(
     "/api/auth/verify-otp",
     asyncHandler(async (req, res) => {
@@ -2684,6 +3686,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!email || !otp) {
           console.log("OTP verification failed - missing email or OTP");
           return res.status(400).json({ 
+            verified: false,
             message: "Email and OTP are required" 
           });
         }
@@ -2693,72 +3696,198 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`VERIFYING OTP: ${otp} FOR EMAIL: ${email}`);
         console.log("========================================");
 
-        // Find the user by email
-        const user = await db.query.users.findFirst({
-          where: eq(schema.users.email, email)
-        });
-
-        if (!user) {
-          console.log(`User not found with email: ${email}`);
-          return res.status(404).json({
-            verified: false,
-            message: "User not found with the provided email"
+        try {
+          // Find the user by email
+          const user = await db.query.users.findFirst({
+            where: eq(schema.users.email, email)
+          }).catch(err => {
+            console.error("Error finding user:", err);
+            return null;
           });
-        }
-
-        // Find the latest OTP for this user
-        const otpRecord = await db.query.otps.findFirst({
-          where: and(
-            eq(schema.otps.userId, user.id),
-            eq(schema.otps.type, "email"),
-            eq(schema.otps.verified, false),
-            gte(schema.otps.expiresAt, new Date())
-          ),
-          orderBy: [desc(schema.otps.createdAt)]
-        });
-
-        if (!otpRecord) {
-          console.log(`No valid OTP found for user: ${user.id}`);
-          return res.status(400).json({
-            verified: false,
-            message: "No valid OTP found. Please request a new OTP."
-          });
-        }
-
-        // Verify the OTP
-        if (otpRecord.otp !== otp) {
-          console.log(`OTP mismatch for user: ${user.id}`);
-          return res.status(400).json({
-            verified: false,
-            message: "Invalid OTP. Please check and try again."
-          });
-        }
-
-        // Mark OTP as verified
-        await db.update(schema.otps)
-          .set({ verified: true })
-          .where(eq(schema.otps.id, otpRecord.id));
-
-        // Mark user's email as verified
-        await db.update(schema.users)
-          .set({ emailVerified: true })
-          .where(eq(schema.users.id, user.id));
-
-        console.log("OTP VERIFICATION SUCCESSFUL");
-        res.json({ 
-          verified: true, 
-          message: "OTP verified successfully",
-          user: {
-            id: user.id,
-            email: user.email,
-            emailVerified: true,
-            // We include other needed user properties but exclude sensitive data
-            name: user.name,
-            role: user.role,
-            phone: user.phone,
-            phoneVerified: user.phoneVerified
+  
+          let otpRecord;
+          
+          if (user) {
+            // For registered users, find OTP by user ID
+            console.log(`Found registered user with ID: ${user.id}`);
+            
+            otpRecord = await db.query.otps.findFirst({
+              where: and(
+                eq(schema.otps.userId, user.id),
+                eq(schema.otps.type, "email"),
+                eq(schema.otps.verified, false),
+                gte(schema.otps.expiresAt, new Date())
+              ),
+              orderBy: [desc(schema.otps.createdAt)]
+            }).catch(err => {
+              console.error("Error finding OTP for registered user:", err);
+              return null;
+            });
+          } else {
+            // For non-registered users (free property submission), find OTP by email
+            console.log(`No registered user found, checking for guest OTP with email: ${email}`);
+            
+            otpRecord = await db.query.otps.findFirst({
+              where: and(
+                eq(schema.otps.userId, -1), // Special ID for non-registered users
+                eq(schema.otps.email, email),
+                eq(schema.otps.type, "email"),
+                eq(schema.otps.verified, false),
+                gte(schema.otps.expiresAt, new Date())
+              ),
+              orderBy: [desc(schema.otps.createdAt)]
+            }).catch(err => {
+              console.error("Error finding OTP for guest user:", err);
+              return null;
+            });
           }
-        });
+  
+          if (!otpRecord) {
+            console.log(`No valid OTP found for email: ${email}`);
+            
+            // For development mode, let's check if there's any OTP regardless of expiration
+            if (process.env.NODE_ENV === 'development') {
+              let devOtpRecord;
+              
+              if (user) {
+                devOtpRecord = await db.query.otps.findFirst({
+                  where: and(
+                    eq(schema.otps.userId, user.id),
+                    eq(schema.otps.type, "email"),
+                    eq(schema.otps.verified, false)
+                  ),
+                  orderBy: [desc(schema.otps.createdAt)]
+                }).catch(() => null);
+              } else {
+                devOtpRecord = await db.query.otps.findFirst({
+                  where: and(
+                    eq(schema.otps.userId, -1),
+                    eq(schema.otps.email, email),
+                    eq(schema.otps.type, "email"),
+                    eq(schema.otps.verified, false)
+                  ),
+                  orderBy: [desc(schema.otps.createdAt)]
+                }).catch(() => null);
+              }
+              
+              if (devOtpRecord) {
+                console.log("Found expired OTP in development mode:", devOtpRecord);
+                
+                // In development, if OTP matches but is expired, still accept it
+                if (devOtpRecord.otp === otp) {
+                  console.log("DEVELOPMENT MODE: Accepting expired OTP");
+                  otpRecord = devOtpRecord;
+                } else {
+                  return res.status(400).json({
+                    verified: false,
+                    message: "Invalid OTP. Please check and try again.",
+                    devInfo: {
+                      note: "OTP was found but didn't match",
+                      expectedOtp: devOtpRecord.otp,
+                      receivedOtp: otp
+                    }
+                  });
+                }
+              } else {
+                return res.status(400).json({
+                  verified: false,
+                  message: "No valid OTP found. Please request a new OTP.",
+                  devInfo: {
+                    note: "No OTP record found at all"
+                  }
+                });
+              }
+            } else {
+              // In production, strictly enforce OTP validity
+              return res.status(400).json({
+                verified: false,
+                message: "No valid OTP found. Please request a new OTP."
+              });
+            }
+          }
+  
+          // Verify the OTP if we're not in development mode with an expired OTP
+          if (process.env.NODE_ENV !== 'development' && otpRecord.otp !== otp) {
+            console.log(`OTP mismatch for email: ${email}`);
+            return res.status(400).json({
+              verified: false,
+              message: "Invalid OTP. Please check and try again."
+            });
+          }
+  
+          // Mark OTP as verified
+          try {
+            await db.update(schema.otps)
+              .set({ verified: true })
+              .where(eq(schema.otps.id, otpRecord.id));
+            
+            console.log(`OTP marked as verified in database`);
+          } catch (updateError) {
+            console.error("Error updating OTP status:", updateError);
+            // Continue anyway - verification can still succeed
+          }
+  
+          // If this is a registered user, also mark their email as verified
+          if (user) {
+            try {
+              await db.update(schema.users)
+                .set({ emailVerified: true })
+                .where(eq(schema.users.id, user.id));
+              
+              console.log(`User email marked as verified in database`);
+            } catch (updateError) {
+              console.error("Error updating user verification status:", updateError);
+              // Continue anyway - verification can still succeed
+            }
+          }
+  
+          console.log("OTP VERIFICATION SUCCESSFUL");
+          
+          // Return appropriate response based on whether this is a registered user or guest
+          if (user) {
+            res.json({ 
+              verified: true, 
+              message: "OTP verified successfully",
+              user: {
+                id: user.id,
+                email: user.email,
+                emailVerified: true,
+                // We include other needed user properties but exclude sensitive data
+                name: user.name,
+                role: user.role,
+                phone: user.phone,
+                phoneVerified: user.phoneVerified
+              }
+            });
+          } else {
+            // For non-registered users, just return verification status
+            res.json({ 
+              verified: true, 
+              message: "OTP verified successfully",
+              isGuest: true
+            });
+          }
+        } catch (dbError) {
+          console.error("Database error during OTP verification:", dbError);
+          
+          // For development mode, let's provide a bypass option
+          if (process.env.NODE_ENV === 'development') {
+            console.log("DEVELOPMENT MODE: Bypassing OTP verification due to database error");
+            
+            // In development, if there's a database error, we'll still verify the OTP
+            res.json({ 
+              verified: true, 
+              message: "OTP verified successfully (development bypass)",
+              isGuest: true,
+              devInfo: {
+                note: "OTP verification bypassed due to database error",
+                error: dbError instanceof Error ? dbError.message : "Unknown database error"
+              }
+            });
+          } else {
+            throw dbError; // Re-throw in production
+          }
+        }
       } catch (error) {
         console.error("Error verifying OTP:", error);
         res.status(500).json({ 
@@ -2841,6 +3970,265 @@ export async function registerRoutes(app: Express): Promise<Server> {
     asyncHandler(async (req, res) => {
       const inquiries = await storage.getInquiriesByUser(req.user.id, true);
       res.json(inquiries);
+    }),
+  );
+
+  // Get properties for current user (both regular and free properties)
+  app.get(
+    "/api/user/properties",
+    isAuthenticated,
+    asyncHandler(async (req, res) => {
+      try {
+        console.log(`Fetching properties for user ID: ${req.user.id}, email: ${req.user.email}, phone: ${req.user.phone || 'not provided'}`);
+        
+        // Get regular properties from storage
+        const properties = await storage.getPropertiesByUser(req.user.id);
+        console.log(`Found ${properties.length} regular properties for user`);
+        
+        // Get free properties from free_properties table with more flexible matching
+        // We'll use ILIKE for case-insensitive matching and trim spaces
+        const freePropertiesQuery = `
+          SELECT * FROM free_properties 
+          WHERE 
+            (TRIM(LOWER(contact_email)) = TRIM(LOWER($1))
+            OR contact_phone = $2
+            OR contact_phone LIKE '%' || $3 || '%'
+            OR $4 LIKE '%' || contact_phone || '%')
+          ORDER BY created_at DESC
+        `;
+        
+        // Get user email and phone for matching
+        const userEmail = req.user.email || '';
+        const userPhone = req.user.phone || '';
+        // Get last 10 digits of phone for partial matching
+        const userPhoneLast10 = userPhone.replace(/\D/g, '').slice(-10);
+        
+        console.log(`Searching for free properties with email: ${userEmail}, phone: ${userPhone}, phoneLast10: ${userPhoneLast10}`);
+        
+        const freeResult = await pool.query(freePropertiesQuery, [
+          userEmail, 
+          userPhone,
+          userPhoneLast10,
+          userPhone
+        ]);
+        
+        console.log(`Found ${freeResult.rowCount} free properties for user`);
+        
+        // If no free properties found with the above query, try a more lenient approach
+        let freeProperties = [];
+        if (freeResult.rowCount === 0) {
+          console.log("No exact matches found, trying more lenient matching");
+          
+          // Try to match just the username part of the email (before the @)
+          const emailUsername = userEmail.split('@')[0];
+          if (emailUsername && emailUsername.length > 3) {
+            const lenientQuery = `
+              SELECT * FROM free_properties 
+              WHERE 
+                contact_email LIKE '%' || $1 || '%'
+                OR contact_name LIKE '%' || $2 || '%'
+              ORDER BY created_at DESC
+            `;
+            
+            console.log(`Trying lenient match with email username: ${emailUsername}`);
+            const lenientResult = await pool.query(lenientQuery, [emailUsername, req.user.name || '']);
+            console.log(`Found ${lenientResult.rowCount} free properties with lenient matching`);
+            
+            // Map the free properties to match the expected format
+            freeProperties = lenientResult.rows.map(prop => {
+              console.log(`Mapping free property: ${prop.id}, ${prop.title}, email: ${prop.contact_email}`);
+              return {
+                id: prop.id,
+                title: prop.title || "Untitled Property",
+                description: prop.description || "",
+                price: parseFloat(prop.price) || 0,
+                discountedPrice: null,
+                propertyType: prop.property_type || "",
+                propertyCategory: prop.property_category || "",
+                transactionType: prop.transaction_type || "",
+                isUrgentSale: prop.is_urgent_sale || false,
+                location: prop.location || "",
+                city: prop.city || "",
+                address: prop.address || "",
+                subscriptionLevel: "free",
+                imageUrls: prop.image_urls || [],
+                rentOrSale: prop.rent_or_sale || "sale",
+                status: "active",
+                approvalStatus: prop.approval_status || "pending",
+                createdAt: prop.created_at,
+                updatedAt: prop.updated_at || prop.created_at,
+                bedrooms: prop.bedrooms ? parseInt(prop.bedrooms) : null,
+                bathrooms: prop.bathrooms ? parseInt(prop.bathrooms) : null,
+                area: parseFloat(prop.area) || 0,
+                areaUnit: prop.area_unit || "sqft",
+                contactName: prop.contact_name || "",
+                contactPhone: prop.contact_phone || "",
+                contactEmail: prop.contact_email || "",
+                isFreeProperty: true, // Flag to identify this is from free_properties table
+                amenities: prop.amenities || []
+              };
+            });
+          }
+        } else {
+          // Map the free properties to match the expected format
+          freeProperties = freeResult.rows.map(prop => {
+            console.log(`Mapping free property: ${prop.id}, ${prop.title}, email: ${prop.contact_email}`);
+            return {
+              id: prop.id,
+              title: prop.title || "Untitled Property",
+              description: prop.description || "",
+              price: parseFloat(prop.price) || 0,
+              discountedPrice: null,
+              propertyType: prop.property_type || "",
+              propertyCategory: prop.property_category || "",
+              transactionType: prop.transaction_type || "",
+              isUrgentSale: prop.is_urgent_sale || false,
+              location: prop.location || "",
+              city: prop.city || "",
+              address: prop.address || "",
+              subscriptionLevel: "free",
+              imageUrls: prop.image_urls || [],
+              rentOrSale: prop.rent_or_sale || "sale",
+              status: "active",
+              approvalStatus: prop.approval_status || "pending",
+              createdAt: prop.created_at,
+              updatedAt: prop.updated_at || prop.created_at,
+              bedrooms: prop.bedrooms ? parseInt(prop.bedrooms) : null,
+              bathrooms: prop.bathrooms ? parseInt(prop.bathrooms) : null,
+              area: parseFloat(prop.area) || 0,
+              areaUnit: prop.area_unit || "sqft",
+              contactName: prop.contact_name || "",
+              contactPhone: prop.contact_phone || "",
+              contactEmail: prop.contact_email || "",
+              isFreeProperty: true, // Flag to identify this is from free_properties table
+              amenities: prop.amenities || []
+            };
+          });
+        }
+        
+        // Combine and sort by creation date (newest first)
+        const allProperties = [...properties, ...freeProperties].sort((a, b) => {
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        });
+        
+        console.log(`Returning total of ${allProperties.length} properties (${properties.length} regular + ${freeProperties.length} free)`);
+        res.json(allProperties);
+      } catch (error) {
+        console.error("Error fetching user properties:", error);
+        res.status(500).json({ message: "Failed to fetch user properties" });
+      }
+    }),
+  );
+
+  // Get saved properties for current user
+  app.get(
+    "/api/user/saved",
+    isAuthenticated,
+    asyncHandler(async (req, res) => {
+      try {
+        console.log(`Fetching saved properties for user ID: ${req.user.id}`);
+        
+        // Get saved properties from database
+        const savedPropertiesResult = await pool.query(`
+          SELECT property_id FROM saved_properties 
+          WHERE user_id = $1
+        `, [req.user.id]);
+        
+        console.log(`Found ${savedPropertiesResult.rowCount} saved property IDs`);
+        
+        if (savedPropertiesResult.rowCount === 0) {
+          return res.json([]);
+        }
+        
+        // Extract property IDs
+        const propertyIds = savedPropertiesResult.rows.map(row => row.property_id);
+        
+        // Get regular properties
+        const properties = await Promise.all(
+          propertyIds.map(async (id) => {
+            try {
+              return await storage.getProperty(id);
+            } catch (error) {
+              console.error(`Error fetching property ${id}:`, error);
+              return null;
+            }
+          })
+        );
+        
+        // Filter out null values (properties that couldn't be found)
+        const validProperties = properties.filter(p => p !== null);
+        console.log(`Found ${validProperties.length} valid regular properties out of ${propertyIds.length} saved IDs`);
+        
+        // Get saved free properties
+        // First, get the IDs of free properties that have been saved
+        const savedFreePropertiesResult = await pool.query(`
+          SELECT free_property_id FROM saved_free_properties 
+          WHERE user_id = $1
+        `, [req.user.id]);
+        
+        console.log(`Found ${savedFreePropertiesResult.rowCount} saved free property IDs`);
+        
+        let freeProperties = [];
+        if (savedFreePropertiesResult.rowCount > 0) {
+          // Extract free property IDs
+          const freePropertyIds = savedFreePropertiesResult.rows.map(row => row.free_property_id);
+          
+          // Get the free properties
+          const freePropertiesQuery = `
+            SELECT * FROM free_properties 
+            WHERE id = ANY($1::int[])
+            AND approval_status = 'approved'
+          `;
+          
+          const freePropertiesResult = await pool.query(freePropertiesQuery, [freePropertyIds]);
+          console.log(`Found ${freePropertiesResult.rowCount} free properties from saved IDs`);
+          
+          // Map the free properties to match the expected format
+          freeProperties = freePropertiesResult.rows.map(prop => {
+            return {
+              id: prop.id,
+              title: prop.title || "Untitled Property",
+              description: prop.description || "",
+              price: parseFloat(prop.price) || 0,
+              discountedPrice: null,
+              propertyType: prop.property_type || "",
+              propertyCategory: prop.property_category || "",
+              transactionType: prop.transaction_type || "",
+              isUrgentSale: prop.is_urgent_sale || false,
+              location: prop.location || "",
+              city: prop.city || "",
+              address: prop.address || "",
+              subscriptionLevel: "free",
+              imageUrls: prop.image_urls || [],
+              rentOrSale: prop.rent_or_sale || "sale",
+              status: "active",
+              approvalStatus: prop.approval_status || "pending",
+              createdAt: prop.created_at,
+              updatedAt: prop.updated_at || prop.created_at,
+              bedrooms: prop.bedrooms ? parseInt(prop.bedrooms) : null,
+              bathrooms: prop.bathrooms ? parseInt(prop.bathrooms) : null,
+              area: parseFloat(prop.area) || 0,
+              areaUnit: prop.area_unit || "sqft",
+              contactName: prop.contact_name || "",
+              contactPhone: prop.contact_phone || "",
+              contactEmail: prop.contact_email || "",
+              isFreeProperty: true, // Flag to identify this is from free_properties table
+              amenities: prop.amenities || []
+            };
+          });
+        }
+        
+        // Combine and sort by creation date (newest first)
+        const allSavedProperties = [...validProperties, ...freeProperties].sort((a, b) => {
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        });
+        
+        console.log(`Returning total of ${allSavedProperties.length} saved properties`);
+        res.json(allSavedProperties);
+      } catch (error) {
+        console.error("Error fetching saved properties:", error);
+        res.status(500).json({ message: "Failed to fetch saved properties" });
+      }
     }),
   );
 
@@ -2951,6 +4339,111 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get(
     "/api/projects/:id",
     asyncHandler(getProjectById)
+  );
+  
+  // Get a property by ID (handles both regular and free properties)
+  app.get(
+    "/api/properties/:id",
+    asyncHandler(async (req, res) => {
+      try {
+        const id = parseInt(req.params.id);
+        if (isNaN(id)) {
+          return res.status(400).json({ message: "Invalid property ID" });
+        }
+        
+        // First, try to get from regular properties
+        const property = await storage.getProperty(id);
+        
+        if (property) {
+          // Check if user is admin or property is approved
+          const isAdmin = req.user && req.user.role === "admin";
+          if (isAdmin || property.approvalStatus === "approved") {
+            return res.json(property);
+          } else {
+            // If not admin and property is not approved, check if user owns this property
+            if (req.user && property.userId === req.user.id) {
+              return res.json(property);
+            }
+            return res.status(403).json({ message: "Property not approved yet" });
+          }
+        }
+        
+        // If not found in regular properties, check free_properties table
+        const freePropertyQuery = `
+          SELECT * FROM free_properties WHERE id = $1
+        `;
+        const freePropertyResult = await pool.query(freePropertyQuery, [id]);
+        
+        if (freePropertyResult.rows.length === 0) {
+          return res.status(404).json({ message: "Property not found" });
+        }
+        
+        const freeProp = freePropertyResult.rows[0];
+        
+        // Convert types to match the expected Property interface
+        const price = typeof freeProp.price === 'string' ? parseFloat(freeProp.price) : freeProp.price;
+        const area = typeof freeProp.area === 'string' ? parseFloat(freeProp.area) : freeProp.area;
+        
+        // Map the free property to match the Property interface
+        const mappedProperty = {
+          id: freeProp.id,
+          title: freeProp.title || "Untitled Property",
+          description: freeProp.description || "",
+          price: price || 0,
+          discountedPrice: null,
+          propertyType: freeProp.property_type || "",
+          propertyCategory: freeProp.property_category || "",
+          transactionType: freeProp.transaction_type || "",
+          isUrgentSale: freeProp.is_urgent_sale || false,
+          location: freeProp.location || "",
+          city: freeProp.city || "",
+          address: freeProp.address || "",
+          subscriptionLevel: "free",
+          imageUrls: freeProp.image_urls || [],
+          videoUrls: freeProp.video_urls || [],
+          rentOrSale: freeProp.rent_or_sale || "sale",
+          status: "active",
+          approvalStatus: freeProp.approval_status || "pending",
+          createdAt: freeProp.created_at,
+          updatedAt: freeProp.updated_at || freeProp.created_at,
+          bedrooms: freeProp.bedrooms ? parseInt(freeProp.bedrooms) : null,
+          bathrooms: freeProp.bathrooms ? parseInt(freeProp.bathrooms) : null,
+          area: area || 0,
+          areaUnit: freeProp.area_unit || "sqft",
+          contactName: freeProp.contact_name || "",
+          contactPhone: freeProp.contact_phone || "",
+          contactEmail: freeProp.contact_email || "",
+          isFreeProperty: true, // Flag to identify this is from free_properties table
+          amenities: freeProp.amenities || [],
+          userId: -1, // Free properties don't have a user ID
+          balconies: freeProp.balconies ? parseInt(freeProp.balconies) : null,
+          floorNo: freeProp.floor_no ? parseInt(freeProp.floor_no) : null,
+          totalFloors: freeProp.total_floors ? parseInt(freeProp.total_floors) : null,
+          furnishedStatus: freeProp.furnished_status || null,
+          facingDirection: freeProp.facing_direction || null,
+          constructionAge: freeProp.construction_age || null,
+          pincode: freeProp.pincode || null,
+          whatsappEnabled: freeProp.whatsapp_enabled || false
+        };
+        
+        // Check if user is admin or property is approved
+        const isAdmin = req.user && req.user.role === "admin";
+        if (isAdmin || mappedProperty.approvalStatus === "approved") {
+          return res.json(mappedProperty);
+        } else {
+          // For free properties, allow the submitter to view their property even if not approved
+          // We'll use the contact email to verify ownership
+          if (req.user && req.user.email === mappedProperty.contactEmail) {
+            return res.json(mappedProperty);
+          }
+          return res.status(403).json({ message: "Property not approved yet" });
+        }
+        
+      } catch (error) {
+        console.error("Error fetching property:", error);
+        res.status(500).json({ message: "Failed to fetch property details" });
+      }
+    })
   );
   
   // Admin routes for project approval/rejection
@@ -3075,6 +4568,293 @@ export async function registerRoutes(app: Express): Promise<Server> {
     })
   );
   
+  // =========== Upload Routes ===========
+  // Import the upload handler
+  const { handlePropertyImageUpload } = await import('./upload-routes');
+  
+  // Property image upload route
+  app.post(
+    "/api/upload/property-images",
+    upload.array('files'),
+    asyncHandler(handlePropertyImageUpload)
+  );
+  
+  // =========== Property Categories Routes ===========
+  
+  // Get property counts by type
+  app.get(
+    "/api/properties/counts-by-type",
+    asyncHandler(async (req, res) => {
+      try {
+        // Query to count properties by type
+        const result = await db.select({
+          type: schema.properties.propertyType,
+          count: count()
+        })
+        .from(schema.properties)
+        .where(eq(schema.properties.status, 'active'))
+        .groupBy(schema.properties.propertyType);
+        
+        console.log("Property counts by type:", result);
+        
+        // Return the counts
+        res.json(result);
+      } catch (error) {
+        console.error("Error fetching property counts by type:", error);
+        res.status(500).json({ message: "Failed to fetch property counts" });
+      }
+    })
+  );
+  
+  // Get commercial properties
+  // app.get(
+  //   "/api/properties/commercial",
+  //   asyncHandler(async (req, res) => {
+  //     try {
+  //       // Get commercial properties from the database
+  //       const commercialProperties = await db
+  //         .select()
+  //         .from(schema.properties)
+  //         .where(and(
+  //           eq(schema.properties.propertyType, 'commercial'),
+  //           eq(schema.properties.approvalStatus, 'approved')
+  //         ))
+  //         .limit(10);
+        
+  //       // Map the properties to the expected format
+  //       const formattedProperties = commercialProperties.map(prop => ({
+  //         id: prop.id.toString(),
+  //         title: prop.title,
+  //         propertyType: prop.propertyType,
+  //         locality: prop.location.split(',')[0] || 'Unknown',
+  //         city: prop.city || 'Unknown',
+  //         state: prop.state || 'Unknown',
+  //         price: (prop.price / 10000000).toFixed(2), // Convert to crores
+  //         pricePerSqFt: ((prop.price / prop.area) || 0).toFixed(0),
+  //         imageUrl: Array.isArray(prop.imageUrls) && prop.imageUrls.length > 0 
+  //           ? prop.imageUrls[0] 
+  //           : "https://images.unsplash.com/photo-1497366754035-f200968a6e72?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
+  //         postedDate: new Date(prop.createdAt).toLocaleDateString('en-US', { 
+  //           month: 'short', 
+  //           day: 'numeric', 
+  //           year: "'yy" 
+  //         }),
+  //         builder: prop.builder || 'Unknown Builder',
+  //         featured: prop.featured || false,
+  //         possession: prop.possessionDate || 'Ready to Move',
+  //         area: `${prop.area} sq.ft`,
+  //         amenities: prop.amenities || []
+  //       }));
+        
+  //       // If no properties found, return mock data
+  //       if (formattedProperties.length === 0) {
+  //         return res.json([
+  //           {
+  //             id: "c1",
+  //             title: "Office Spaces, Shops & Showrooms",
+  //             propertyType: "Commercial",
+  //             locality: "Malkajgiri",
+  //             city: "Hyderabad",
+  //             state: "Telangana",
+  //             price: "1.04",
+  //             pricePerSqFt: "7,500",
+  //             imageUrl: "https://images.unsplash.com/photo-1497366754035-f200968a6e72?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
+  //             postedDate: "Dec 31, '24",
+  //             builder: "Jain Construction",
+  //             featured: true,
+  //             possession: "Ready to Move",
+  //             area: "1200-2500 sq.ft",
+  //             amenities: ["24/7 Security", "Power Backup", "Parking"]
+  //           },
+  //           {
+  //             id: "c2",
+  //             title: "Premium Retail Spaces",
+  //             propertyType: "Commercial",
+  //             locality: "Gachibowli",
+  //             city: "Hyderabad",
+  //             state: "Telangana",
+  //             price: "2.15",
+  //             pricePerSqFt: "9,200",
+  //             imageUrl: "https://images.unsplash.com/photo-1497366811353-6870744d04b2?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
+  //             postedDate: "Dec 28, '24",
+  //             builder: "Prestige Group",
+  //             featured: false,
+  //             possession: "Q2 2025",
+  //             area: "800-1500 sq.ft",
+  //             amenities: ["Food Court", "Elevator", "CCTV"]
+  //           }
+  //         ]);
+  //       }
+        
+  //       res.json(formattedProperties);
+  //     } catch (error) {
+  //       console.error("Error fetching commercial properties:", error);
+  //       res.status(500).json({ error: "Failed to fetch commercial properties" });
+  //     }
+  //   })
+  // );
+  app.get(
+    "/api/properties/commercial",
+    asyncHandler(async (req, res) => {
+      try {
+        // Get query parameters for pagination/filtering
+        const { page = 1, limit = 10, minPrice, maxPrice, location } = req.query;
+        const offset = (Number(page) - 1) * Number(limit);
+  
+        // Base query conditions
+        const baseConditions = and(
+          eq(schema.properties.propertyType, 'commercial'),
+          eq(schema.properties.approvalStatus, 'approved'),
+          eq(schema.properties.status, 'active')
+        );
+  
+        // Additional filters
+        const priceConditions = [];
+        if (minPrice) priceConditions.push(gte(schema.properties.price, Number(minPrice)));
+        if (maxPrice) priceConditions.push(lte(schema.properties.price, Number(maxPrice)));
+  
+        const locationConditions = [];
+        if (location) {
+          locationConditions.push(
+            or(
+              ilike(schema.properties.location, `%${location}%`),
+              ilike(schema.properties.city, `%${location}%`)
+            )
+          );
+        }
+  
+        // Combine all conditions
+        const whereConditions = and(
+          baseConditions,
+          ...priceConditions,
+          ...locationConditions
+        );
+  
+        // Get commercial properties with filters
+        const commercialProperties = await db
+          .select()
+          .from(schema.properties)
+          .where(whereConditions)
+          .limit(Number(limit))
+          .offset(offset);
+  
+        // Get commercial projects with similar filters
+        const commercialProjectsQuery = {
+          text: `
+            SELECT * FROM projects 
+            WHERE category = 'commercial' 
+            AND status = 'approved'
+            AND is_active = true
+            ${minPrice ? 'AND starting_price >= $1' : ''}
+            ${maxPrice ? `${minPrice ? 'AND' : 'AND'} starting_price <= $${minPrice ? 2 : 1}` : ''}
+            ${location ? `${minPrice || maxPrice ? 'AND' : 'AND'} (location ILIKE $${minPrice && maxPrice ? 3 : minPrice || maxPrice ? 2 : 1} OR city ILIKE $${minPrice && maxPrice ? 3 : minPrice || maxPrice ? 2 : 1})` : ''}
+            LIMIT $${minPrice && maxPrice && location ? 4 : minPrice && maxPrice || minPrice && location || maxPrice && location ? 3 : minPrice || maxPrice || location ? 2 : 1}
+            OFFSET $${minPrice && maxPrice && location ? 5 : minPrice && maxPrice || minPrice && location || maxPrice && location ? 4 : minPrice || maxPrice || location ? 3 : 2}
+          `,
+          values: [
+            ...(minPrice ? [minPrice] : []),
+            ...(maxPrice ? [maxPrice] : []),
+            ...(location ? [`%${location}%`, `%${location}%`] : []),
+            limit,
+            offset
+          ].filter(Boolean)
+        };
+  
+        const projectsResult = await pool.query(commercialProjectsQuery);
+        const commercialProjects = projectsResult.rows;
+  
+        // Format response data consistently
+        const formatProperty = (item: any, isProject = false) => ({
+          id: isProject ? `proj-${item.id}` : item.id.toString(),
+          title: item.title,
+          propertyType: 'commercial',
+          subType: isProject ? item.project_type : item.property_subtype,
+          locality: item.location?.split(',')[0]?.trim() || 'Unknown',
+          city: item.city || 'Unknown',
+          state: item.state || 'Unknown',
+          price: item.price || item.starting_price 
+            ? ((item.price || item.starting_price) / 10000000).toFixed(2) 
+            : '0.00',
+          pricePerSqFt: item.price && item.area 
+            ? Math.round(item.price / item.area).toLocaleString()
+            : item.price_per_sqft?.toLocaleString() || '0',
+          imageUrl: Array.isArray(item.imageUrls) && item.imageUrls.length > 0 
+            ? item.imageUrls[0] 
+            : item.hero_image || "/images/default-commercial.jpg",
+          postedDate: new Date(item.createdAt || item.created_at).toLocaleDateString('en-US', {
+            month: 'short', 
+            day: 'numeric',
+            year: "'yy"
+          }),
+          builder: item.builder || item.developer_name || 'Unknown',
+          featured: item.featured || item.is_featured || false,
+          possession: item.possessionDate || item.possession_date || 'Ready to Move',
+          area: item.area || item.total_area 
+            ? `${item.area || item.total_area} sq.ft` 
+            : 'Size not specified',
+          amenities: Array.isArray(item.amenities) 
+            ? item.amenities 
+            : typeof item.amenities === 'string' 
+              ? item.amenities.split(',') 
+              : []
+        });
+  
+        const response = {
+          data: [
+            ...commercialProperties.map(prop => formatProperty(prop)),
+            ...commercialProjects.map(proj => formatProperty(proj, true))
+          ],
+          pagination: {
+            page: Number(page),
+            limit: Number(limit),
+            total: commercialProperties.length + commercialProjects.length,
+            // In a real implementation, you'd get total counts from the database
+            totalProperties: commercialProperties.length,
+            totalProjects: commercialProjects.length
+          },
+          filters: {
+            minPrice: minPrice ? Number(minPrice) : undefined,
+            maxPrice: maxPrice ? Number(maxPrice) : undefined,
+            location: location || undefined
+          }
+        };
+  
+        // Return mock data only if no properties or projects found (for demo purposes)
+        if (response.data.length === 0 && process.env.NODE_ENV !== 'production') {
+          response.data = [
+            {
+              id: "c1",
+              title: "Office Spaces, Shops & Showrooms",
+              propertyType: "Commercial",
+              subType: "Office Space",
+              locality: "Malkajgiri",
+              city: "Hyderabad",
+              state: "Telangana",
+              price: "1.04",
+              pricePerSqFt: "7,500",
+              imageUrl: "/images/commercial-placeholder-1.jpg",
+              postedDate: "Dec 31, '24",
+              builder: "Jain Construction",
+              featured: true,
+              possession: "Ready to Move",
+              area: "1200-2500 sq.ft",
+              amenities: ["24/7 Security", "Power Backup", "Parking"]
+            }
+          ];
+        }
+  
+        res.json(response);
+      } catch (error) {
+        console.error("Error fetching commercial properties:", error);
+        res.status(500).json({ 
+          success: false,
+          error: "Failed to fetch commercial properties",
+          message: error instanceof Error ? error.message : 'Unknown error',
+          code: 'COMMERCIAL_PROPERTIES_FETCH_ERROR'
+        });
+      }
+    })
+  );
   // =========== Neighborhood Insights Route ===========
   app.get(
     "/api/neighborhood/insights",

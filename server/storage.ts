@@ -85,6 +85,7 @@ export interface IStorage {
   getUrgentSaleProperties(limit?: number): Promise<Property[]>;
   getTopProperties(category: string, location?: string, limit?: number): Promise<Property[]>;
   getPropertyCities(): Promise<string[]>;
+  getPropertyCountsByType(): Promise<Array<{type: string, count: number}>>;
   searchProperties(query: {
     city?: string;
     propertyType?: string;
@@ -789,6 +790,30 @@ export class MemStorage implements IStorage {
       });
     
     return Array.from(cities).sort();
+  }
+  
+  async getPropertyCountsByType(): Promise<Array<{type: string, count: number}>> {
+    // Get counts of approved properties by type
+    const typeCounts = new Map<string, number>();
+    
+    // Count properties by type
+    Array.from(this.properties.values())
+      .filter(property => property.approvalStatus === 'approved')
+      .forEach(property => {
+        if (property.propertyType) {
+          const type = property.propertyType;
+          typeCounts.set(type, (typeCounts.get(type) || 0) + 1);
+        }
+      });
+    
+    // Convert to array of objects
+    const result = Array.from(typeCounts.entries()).map(([type, count]) => ({
+      type,
+      count
+    }));
+    
+    // Sort by count (highest first)
+    return result.sort((a, b) => b.count - a.count);
   }
 
   async getFeaturedProperties(limit: number = 6): Promise<Property[]> {

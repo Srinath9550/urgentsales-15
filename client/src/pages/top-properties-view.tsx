@@ -275,8 +275,8 @@ export default function TopPropertiesView() {
                 {filteredProperties?.map((property) => (
                   <PropertyCard
                     key={property.id}
-                    property={property}
-                    className="h-full transition-transform duration-200 hover:scale-[1.02]"
+                    prop={property}
+                    isAiRecommended={property.premium || false}
                   />
                 ))}
                 {filteredProperties?.length === 0 && (

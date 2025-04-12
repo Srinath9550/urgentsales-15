@@ -538,7 +538,32 @@ export default function AddProperty() {
                                   directly. Max file size: 20MB.
                                 </p>
                                 <FileUpload
-                                  onFilesSelected={setUploadedFiles}
+                                  onFilesSelected={(files) => {
+                                    setUploadedFiles(files);
+                                    console.log("Files updated:", files);
+                                    
+                                    // Extract server URLs from successfully uploaded files
+                                    const serverUrls = files
+                                      .filter(file => file.status === 'success' && file.serverUrl)
+                                      .map(file => file.serverUrl)
+                                      .filter(url => url && url.length > 0);
+                                    
+                                    console.log("Server URLs:", serverUrls);
+                                    
+                                    // Update the imageUrlsInput field with the server URLs
+                                    const currentValue = form.getValues("imageUrlsInput") || "";
+                                    const existingUrls = currentValue
+                                      ? currentValue.split(",").map(url => url.trim()).filter(url => url.length > 0)
+                                      : [];
+                                    
+                                    // Combine existing URLs with new ones
+                                    const allUrls = [...existingUrls, ...serverUrls];
+                                    
+                                    // Remove duplicates
+                                    const uniqueUrls = [...new Set(allUrls)];
+                                    
+                                    form.setValue("imageUrlsInput", uniqueUrls.join(","));
+                                  }}
                                   initialFiles={uploadedFiles}
                                   maxFiles={25}
                                   allowMultiple={true}

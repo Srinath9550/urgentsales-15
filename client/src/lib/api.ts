@@ -20,54 +20,125 @@ export const queryClient = new QueryClient({
 /**
  * Helper function for API requests
  */
-export async function apiRequest(
-  method: 'GET' | 'POST' | 'PUT' | 'DELETE',
-  endpoint: string,
-  data?: any,
-  options: RequestInit = {}
-) {
-  const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-  const url = `${baseUrl}${endpoint}`;
+export async function apiRequest({
+  url,
+  method = 'GET',
+  body,
+  headers = {},
+}: {
+  url: string;
+  method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
+  body?: any;
+  headers?: Record<string, string>;
+}) {
+  console.log(`API Request: ${method} ${url}`);
   
   const token = localStorage.getItem('token');
+  const isFormData = body instanceof FormData;
+  
+  // Don't set Content-Type for FormData as the browser needs to set the boundary
+  const requestHeaders: Record<string, string> = {
+    ...(token && { Authorization: `Bearer ${token}` }),
+    ...(!isFormData && { 'Content-Type': 'application/json' }),
+    ...headers,
+  };
+  
+  console.log("Request headers:", requestHeaders);
   
   const requestOptions: RequestInit = {
     method,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token && { Authorization: `Bearer ${token}` }),
-      ...options.headers,
-    },
-    ...options,
+    headers: requestHeaders,
+    credentials: 'include',
   };
   
-  if (data && method !== 'GET') {
-    requestOptions.body = JSON.stringify(data);
+  if (body && method !== 'GET') {
+    if (isFormData) {
+      console.log("Sending FormData body");
+      requestOptions.body = body;
+    } else {
+      console.log("Sending JSON body");
+      requestOptions.body = JSON.stringify(body);
+    }
   }
   
-  const response = await fetch(url, requestOptions);
-  
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: 'Unknown error occurred' }));
-    throw new Error(error.message || 'Request failed');
+  try {
+    console.log(`Fetching ${url} with options:`, {
+      method,
+      headers: requestHeaders,
+      bodyType: isFormData ? 'FormData' : (body ? 'JSON' : 'none')
+    });
+    
+    const response = await fetch(url, requestOptions);
+    console.log(`Response status: ${response.status}`);
+    
+    if (!response.ok) {
+      console.error(`API error: ${response.status} ${response.statusText}`);
+      
+      // Try to parse error response
+      try {
+        const errorData = await response.json();
+        console.error("Error response data:", errorData);
+        throw {
+          status: response.status,
+          message: errorData.message || 'Request failed',
+          data: errorData
+        };
+      } catch (parseError) {
+        // If we can't parse JSON, use status text
+        throw {
+          status: response.status,
+          message: response.statusText || 'Request failed',
+        };
+      }
+    }
+    
+    // Check if response is empty
+    const contentType = response.headers.get('content-type');
+    if (contentType && contentType.includes('application/json')) {
+      const data = await response.json();
+      console.log("Response data:", data);
+      return data;
+    } else {
+      console.log("Response is not JSON");
+      return { success: true, status: response.status };
+    }
+  } catch (error) {
+    console.error("API request error:", error);
+    throw error;
   }
-  
-  return response.json();
 }
 
 // Common API methods
 export const api = {
-  get: (endpoint: string, options?: RequestInit) => 
-    apiRequest('GET', endpoint, undefined, options),
+  get: (endpoint: string, headers?: Record<string, string>) => 
+    apiRequest({
+      url: endpoint,
+      method: 'GET',
+      headers
+    }),
   
-  post: (endpoint: string, data: any, options?: RequestInit) => 
-    apiRequest('POST', endpoint, data, options),
+  post: (endpoint: string, body: any, headers?: Record<string, string>) => 
+    apiRequest({
+      url: endpoint,
+      method: 'POST',
+      body,
+      headers
+    }),
   
-  put: (endpoint: string, data: any, options?: RequestInit) => 
-    apiRequest('PUT', endpoint, data, options),
+  put: (endpoint: string, body: any, headers?: Record<string, string>) => 
+    apiRequest({
+      url: endpoint,
+      method: 'PUT',
+      body,
+      headers
+    }),
   
-  delete: (endpoint: string, options?: RequestInit) => 
-    apiRequest('DELETE', endpoint, undefined, options),
+  delete: (endpoint: string, headers?: Record<string, string>) => 
+    apiRequest({
+      url: endpoint,
+      method: 'DELETE',
+      headers
+    }),
 };
 
 export default api;

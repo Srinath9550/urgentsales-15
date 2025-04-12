@@ -1,11 +1,14 @@
 
-import { useParams } from "react-router-dom";
+import { useParams } from "wouter";
+import { useState } from "react";
 import { Building2, MapPin, Bed, Bath, Square } from "lucide-react";
 import Navbar from "@/components/layout/navbar";
 import Footer from "@/components/layout/footer";
 
 export default function ProjectCategory() {
-  const { category } = useParams();
+  const params = useParams();
+  const category = params.category;
+  const [imageErrors, setImageErrors] = useState<Record<number, boolean>>({});
   
   const dummyProjects = [
     {
@@ -40,7 +43,25 @@ export default function ProjectCategory() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {dummyProjects.map((project) => (
             <div key={project.id} className="bg-white rounded-lg shadow-md overflow-hidden">
-              <img src={project.image} alt={project.title} className="w-full h-48 object-cover" />
+              <div className="relative w-full h-48">
+                {/* Skeleton loader while image is loading */}
+                <div className="absolute inset-0 bg-gray-200 animate-pulse"></div>
+                
+                <img
+                  src={imageErrors[project.id] ? "/placeholder-property.jpg" : project.image}
+                  alt={project.title}
+                  className="w-full h-full object-cover relative z-10"
+                  style={{ opacity: imageErrors[project.id] ? 0.7 : 1 }}
+                  onLoad={() => {
+                    console.log(`Project image loaded successfully: ${project.title}`);
+                  }}
+                  onError={(e) => {
+                    console.log(`Error loading project image: ${project.title}`);
+                    setImageErrors(prev => ({ ...prev, [project.id]: true }));
+                    e.currentTarget.src = "/placeholder-property.jpg";
+                  }}
+                />
+              </div>
               <div className="p-4">
                 <h3 className="text-xl font-semibold mb-2">{project.title}</h3>
                 <div className="flex items-center text-gray-600 mb-2">

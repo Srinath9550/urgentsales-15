@@ -159,7 +159,7 @@ export default function TopPropertiesList() {
                               </div>
                             )}
                             <PropertyCard 
-                              property={property} 
+                              prop={property} 
                               isAiRecommended={property.premium || false} 
                             />
                           </div>

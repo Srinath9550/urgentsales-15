@@ -88,15 +88,22 @@ export default function Dashboard() {
 
   // Delete property mutation
   const deleteMutation = useMutation({
-    mutationFn: async (propertyId: number) => {
+    mutationFn: async (propertyData: { propertyId: number, isFreeProperty?: boolean }) => {
+      const { propertyId } = propertyData;
+      
+      // Use the same endpoint for both regular and free properties
+      const url = `/api/properties/${propertyId}`;
+        
       return await apiRequest({
-        url: `/api/properties/${propertyId}`,
+        url,
         method: "DELETE",
       });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/user/properties"] });
       queryClient.invalidateQueries({ queryKey: ["/api/properties"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/properties/featured"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/recommendations"] });
       refetch();
       toast({
         title: "Property deleted",
@@ -138,9 +145,9 @@ export default function Dashboard() {
     },
   });
 
-  const handleDeleteProperty = (propertyId: number) => {
+  const handleDeleteProperty = (propertyId: number, isFreeProperty?: boolean) => {
     if (confirm("Are you sure you want to delete this property?")) {
-      deleteMutation.mutate(propertyId);
+      deleteMutation.mutate({ propertyId, isFreeProperty });
     }
   };
 
@@ -241,7 +248,7 @@ export default function Dashboard() {
                       asChild
                       className="w-full bg-primary hover:bg-primary/90 text-sm sm:text-base"
                     >
-                      <Link href="/add-property">
+                      <Link href="/post-property-free">
                         <PlusCircle className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
                         <span>Add New Property</span>
                       </Link>
@@ -410,53 +417,53 @@ export default function Dashboard() {
                         </div>
                       ) : properties && properties.length > 0 ? (
                         <div className="space-y-3 sm:space-y-4">
-                          {properties.map((property) => (
+                          {properties.map((prop) => (
                             <div
-                              key={property.id}
+                              key={prop.id}
                               className="border rounded-lg p-3 sm:p-4 hover:shadow-md transition-shadow"
                             >
                               <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
                                 <div className="w-full sm:w-32 h-20 sm:h-24 bg-gray-100 rounded-md overflow-hidden">
                                   <img
                                     src={
-                                      property.imageUrls?.[0] ||
+                                      prop.image_urls || [],
                                       "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=870&q=80"
                                     }
-                                    alt={property.title}
+                                    alt={prop.title}
                                     className="w-full h-full object-cover"
                                   />
                                 </div>
                                 <div className="flex-1">
                                   <h3 className="text-sm sm:text-base font-semibold text-gray-900 mb-1">
-                                    {property.title}
-                                    {property.featured && (
+                                    {prop.title}
+                                    {prop.featured && (
                                       <Badge className="ml-2 text-xs sm:text-sm bg-primary">
                                         Featured
                                       </Badge>
                                     )}
                                   </h3>
                                   <p className="text-xs sm:text-sm text-gray-600 mb-1 sm:mb-2">
-                                    {property.location}, {property.city}
+                                    {prop.location}, {prop.city}
                                   </p>
                                   <div className="flex flex-wrap gap-2 sm:gap-4 text-xs sm:text-sm text-gray-500">
-                                    {property.bedrooms && (
+                                    {prop.bedrooms && (
                                       <div className="flex items-center">
                                         <Bed className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                                        <span>{property.bedrooms} Beds</span>
+                                        <span>{prop.bedrooms} Beds</span>
                                       </div>
                                     )}
-                                    {property.bathrooms && (
+                                    {prop.bathrooms && (
                                       <div className="flex items-center">
                                         <Droplet className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                                        <span>{property.bathrooms} Baths</span>
+                                        <span>{prop.bathrooms} Baths</span>
                                       </div>
                                     )}
                                     <div className="flex items-center">
                                       <Ruler className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                                      <span>{property.area} sq.ft</span>
+                                      <span>{prop.area} sq.ft</span>
                                     </div>
                                     <div className="font-medium text-primary">
-                                      {formatPrice(property.price)}
+                                      {formatPrice(prop.price)}
                                     </div>
                                   </div>
                                 </div>
@@ -466,7 +473,7 @@ export default function Dashboard() {
                                     size="sm"
                                     className="text-xs sm:text-sm text-gray-600 h-7 sm:h-8"
                                     onClick={() =>
-                                      navigate(`/property/${property.id}`)
+                                      navigate(`/property-detail/${prop.id}`)
                                     }
                                   >
                                     <Eye className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
@@ -476,9 +483,10 @@ export default function Dashboard() {
                                     variant="outline"
                                     size="sm"
                                     className="text-xs sm:text-sm text-blue-600 h-7 sm:h-8"
-                                    onClick={() =>
-                                      navigate(`/edit-property/${property.id}`)
-                                    }
+                                    onClick={() => {
+                                      // Use the same edit URL for both regular and free properties
+                                      navigate(`/edit-property/${prop.id}`);
+                                    }}
                                   >
                                     <Edit className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
                                     <span>Edit</span>
@@ -488,7 +496,7 @@ export default function Dashboard() {
                                     size="sm"
                                     className="text-xs sm:text-sm text-red-600 h-7 sm:h-8"
                                     onClick={() =>
-                                      handleDeleteProperty(property.id)
+                                      handleDeleteProperty(prop.id, prop.isFreeProperty)
                                     }
                                   >
                                     <Trash2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
@@ -499,14 +507,14 @@ export default function Dashboard() {
                               <div className="mt-1 sm:mt-2 pt-1 sm:pt-2 border-t text-xs text-gray-500 flex justify-between">
                                 <span>
                                   Listed{" "}
-                                  {property.createdAt
+                                  {prop.createdAt
                                     ? formatDistanceToNow(
-                                        new Date(property.createdAt),
+                                        new Date(prop.createdAt),
                                         { addSuffix: true },
                                       )
                                     : "recently"}
                                 </span>
-                                <span>ID: #{property.id}</span>
+                                <span>ID: #{prop.id}</span>
                               </div>
                             </div>
                           ))}

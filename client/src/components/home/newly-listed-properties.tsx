@@ -169,12 +169,27 @@ export default function NewlyListedProperties() {
             <Link key={property.id} href={`/property/${property.id}`}>
               <div className="bg-white rounded-lg overflow-hidden shadow-md hover:shadow-lg transition-shadow duration-300 h-full flex flex-col">
                 <div className="relative">
-                  <img
-                    src={property.image}
-                    alt={property.title}
-                    onClick={() => window.scrollTo(0, 0)}
-                    className="w-full h-48 object-cover"
-                  />
+                  <div className="relative w-full h-48">
+                    {/* Skeleton loader while image is loading */}
+                    <div className="absolute inset-0 bg-gray-200 animate-pulse"></div>
+                    
+                    <img
+                      src={property.image && property.image.startsWith('http') ? property.image : 
+                           property.image && property.image.startsWith('/') ? property.image : 
+                           property.image ? `/${property.image}` : '/placeholder-property.jpg'}
+                      alt={property.title}
+                      onClick={() => window.scrollTo(0, 0)}
+                      className="w-full h-full object-cover relative z-10"
+                      onLoad={() => {
+                        console.log(`Image loaded successfully: ${property.image}`);
+                      }}
+                      onError={(e) => {
+                        console.log(`Error loading image: ${property.image}`);
+                        e.currentTarget.src = '/placeholder-property.jpg';
+                      }}
+                    />
+                  </div>
+                  
                   <div className="absolute top-2 left-2 flex flex-col gap-2">
                     <span className="bg-green-500 text-white text-xs font-bold px-2 py-1 rounded">
                       NEW

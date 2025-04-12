@@ -17,6 +17,7 @@ import NotFound from "@/pages/not-found";
 import TopPropertiesList from "@/pages/top-properties-list";
 import AuthPage from "@/pages/auth-page";
 import AddProperty from "@/pages/add-property";
+import EditProperty from "@/pages/edit-property";
 import PostPropertyFree from "@/pages/post-property-free";
 import Dashboard from "@/pages/dashboard";
 import PropertyDetail from "@/pages/property-detail";
@@ -172,6 +173,11 @@ function App() {
           <Route path="/add-property">
             <ProtectedRoute>
               <AddProperty />
+            </ProtectedRoute>
+          </Route>
+          <Route path="/edit-property/:id">
+            <ProtectedRoute>
+              <EditProperty />
             </ProtectedRoute>
           </Route>
           <Route path="/recommendations">

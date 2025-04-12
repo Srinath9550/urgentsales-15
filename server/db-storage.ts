@@ -816,6 +816,20 @@ export class DbStorage implements IStorage {
     
     return result.rows.map(row => row.city);
   }
+  
+  async getPropertyCountsByType(): Promise<Array<{type: string, count: number}>> {
+    const result = await db.execute(sql`
+      SELECT property_type as type, COUNT(*) as count 
+      FROM properties 
+      WHERE approval_status = 'approved'
+      GROUP BY property_type
+    `);
+    
+    return result.rows.map(row => ({
+      type: row.type,
+      count: parseInt(row.count)
+    }));
+  }
 
   async getTopProperties(category: string = 'premium', location?: string, limit: number = 10): Promise<Property[]> {
     let query = sql`

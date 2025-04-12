@@ -58,7 +58,7 @@ export default function SubmissionSuccess() {
                 <p className="text-lg text-gray-600 mb-6">
                   {submissionType === 'project' ? 
                     'Your project details have been submitted for verification.' : 
-                    'Your property listing has been submitted for verification.'}
+                    'Your property listing has been submitted for verification and will be visible after admin approval.'}
                 </p>
 
                 {/* {submissionType !== 'project' && ( */}
@@ -80,7 +80,7 @@ export default function SubmissionSuccess() {
                   <Progress value={progress} className="h-2" />
                   <p className="text-sm text-gray-500 mt-2">
                     Our team is reviewing your submission. This process
-                    typically takes 24-48 hours.
+                    typically takes 24-48 hours. Your {submissionType === 'project' ? 'project' : 'property'} will not be visible until approved.
                   </p>
                 </div>
 

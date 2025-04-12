@@ -2,17 +2,18 @@ import React, { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Clock, AlertTriangle, BedDouble, Bath, Square } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 
 // Type for property deals
 interface LimitedTimeDeal {
   id: number;
   title: string;
   location: string;
-  originalPrice: number;
+  price: number;
   discountedPrice: number;
   discountPercentage: number;
   imageUrl: string;
-  endTime: Date; // When the deal expires
+  expiresAt: string; // When the deal expires
   propertyType: string;
   bedrooms?: number;
   bathrooms?: number;
@@ -40,21 +41,34 @@ export default function LimitedTimeDeals() {
   const [manualScrolling, setManualScrolling] = useState(false);
   const manualScrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Updated deals with more varied end times
-  const deals: LimitedTimeDeal[] = [
+  // Fetch urgent properties from API
+  const { data: urgentProperties, isLoading, error } = useQuery<LimitedTimeDeal[]>({
+    queryKey: ['/api/properties/urgent'],
+    queryFn: async () => {
+      const response = await fetch('/api/properties/urgent');
+      if (!response.ok) {
+        throw new Error('Failed to fetch urgent properties');
+      }
+      return response.json();
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+
+  // Fallback deals if API fails or returns empty
+  const fallbackDeals: LimitedTimeDeal[] = [
     // Andhra Pradesh Properties
     {
       id: 1,
       title: "Luxury Villa in Amaravati",
       location: "Amaravati, Andhra Pradesh",
-      originalPrice: 8500000,
+      price: 8500000,
       discountedPrice: 7225000,
       discountPercentage: 15,
       imageUrl:
         "https://images.pexels.com/photos/1396132/pexels-photo-1396132.jpeg?auto=compress&cs=tinysrgb&w=600&h=400",
-      endTime: new Date(
+      expiresAt: new Date(
         Date.now() + 1 * 24 * 60 * 60 * 1000 + 7 * 60 * 60 * 1000,
-      ), // 1 day and 7 hours
+      ).toISOString(), // 1 day and 7 hours
       propertyType: "Villa",
       bedrooms: 4,
       bathrooms: 3,
@@ -64,14 +78,14 @@ export default function LimitedTimeDeals() {
       id: 2,
       title: "Beachfront Property in Visakhapatnam",
       location: "Visakhapatnam, Andhra Pradesh",
-      originalPrice: 12000000,
+      price: 12000000,
       discountedPrice: 9600000,
       discountPercentage: 20,
       imageUrl:
         "https://images.pexels.com/photos/1732414/pexels-photo-1732414.jpeg?auto=compress&cs=tinysrgb&w=600&h=400",
-      endTime: new Date(
+      expiresAt: new Date(
         Date.now() + 3 * 24 * 60 * 60 * 1000 + 2 * 60 * 60 * 1000,
-      ), // 3 days and 2 hours
+      ).toISOString(), // 3 days and 2 hours
       propertyType: "Villa",
       bedrooms: 5,
       bathrooms: 4,
@@ -81,12 +95,12 @@ export default function LimitedTimeDeals() {
       id: 3,
       title: "Modern Apartment in Vijayawada",
       location: "Vijayawada, Andhra Pradesh",
-      originalPrice: 5500000,
+      price: 5500000,
       discountedPrice: 4675000,
       discountPercentage: 15,
       imageUrl:
         "https://images.pexels.com/photos/1571460/pexels-photo-1571460.jpeg?auto=compress&cs=tinysrgb&w=600&h=400",
-      endTime: new Date(Date.now() + 12 * 60 * 60 * 1000), // 12 hours
+      expiresAt: new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString(), // 12 hours
       propertyType: "Apartment",
       bedrooms: 3,
       bathrooms: 2,
@@ -96,14 +110,14 @@ export default function LimitedTimeDeals() {
       id: 4,
       title: "Riverside Bungalow in Rajahmundry",
       location: "Rajahmundry, Andhra Pradesh",
-      originalPrice: 7500000,
+      price: 7500000,
       discountedPrice: 6000000,
       discountPercentage: 20,
       imageUrl:
         "https://images.pexels.com/photos/2079249/pexels-photo-2079249.jpeg?auto=compress&cs=tinysrgb&w=600&h=400",
-      endTime: new Date(
+      expiresAt: new Date(
         Date.now() + 4 * 24 * 60 * 60 * 1000 + 5 * 60 * 60 * 1000,
-      ), // 4 days and 5 hours
+      ).toISOString(), // 4 days and 5 hours
       propertyType: "House",
       bedrooms: 3,
       bathrooms: 2,
@@ -113,14 +127,14 @@ export default function LimitedTimeDeals() {
       id: 5,
       title: "Hillview Villa in Tirupati",
       location: "Tirupati, Andhra Pradesh",
-      originalPrice: 9000000,
+      price: 9000000,
       discountedPrice: 7650000,
       discountPercentage: 15,
       imageUrl:
         "https://images.pexels.com/photos/323780/pexels-photo-323780.jpeg?auto=compress&cs=tinysrgb&w=600&h=400",
-      endTime: new Date(
+      expiresAt: new Date(
         Date.now() + 2 * 24 * 60 * 60 * 1000 + 9 * 60 * 60 * 1000,
-      ), // 2 days and 9 hours
+      ).toISOString(), // 2 days and 9 hours
       propertyType: "Villa",
       bedrooms: 4,
       bathrooms: 3,
@@ -131,14 +145,14 @@ export default function LimitedTimeDeals() {
       id: 6,
       title: "Commercial Space in Nellore",
       location: "Nellore, Andhra Pradesh",
-      originalPrice: 15000000,
+      price: 15000000,
       discountedPrice: 12750000,
       discountPercentage: 15,
       imageUrl:
         "https://images.pexels.com/photos/269077/pexels-photo-269077.jpeg?auto=compress&cs=tinysrgb&w=600&h=400",
-      endTime: new Date(
+      expiresAt: new Date(
         Date.now() + 5 * 24 * 60 * 60 * 1000 + 3 * 60 * 60 * 1000,
-      ), // 5 days and 3 hours
+      ).toISOString(), // 5 days and 3 hours
       propertyType: "Commercial",
       area: 5000,
     },
@@ -146,12 +160,12 @@ export default function LimitedTimeDeals() {
       id: 7,
       title: "Luxury Apartment in Guntur",
       location: "Guntur, Andhra Pradesh",
-      originalPrice: 6500000,
+      price: 6500000,
       discountedPrice: 5200000,
       discountPercentage: 20,
       imageUrl:
         "https://images.pexels.com/photos/1643383/pexels-photo-1643383.jpeg?auto=compress&cs=tinysrgb&w=600&h=400",
-      endTime: new Date(Date.now() + 18 * 60 * 60 * 1000), // 18 hours
+      expiresAt: new Date(Date.now() + 18 * 60 * 60 * 1000).toISOString(), // 18 hours
       propertyType: "Apartment",
       bedrooms: 3,
       bathrooms: 2,
@@ -159,6 +173,11 @@ export default function LimitedTimeDeals() {
     },
     // ... remaining properties with varied end times
   ];
+  
+  // Use API data if available, otherwise use fallback
+  const deals = urgentProperties && urgentProperties.length > 0 
+    ? urgentProperties 
+    : fallbackDeals;
 
   // Calculate time left for each deal with days included
   useEffect(() => {
@@ -174,7 +193,9 @@ export default function LimitedTimeDeals() {
       } = {};
 
       deals.forEach((deal) => {
-        const difference = deal.endTime.getTime() - now.getTime();
+        // Convert expiresAt string to Date object
+        const expiryDate = new Date(deal.expiresAt);
+        const difference = expiryDate.getTime() - now.getTime();
 
         if (difference > 0) {
           const days = Math.floor(difference / (1000 * 60 * 60 * 24));
@@ -196,7 +217,7 @@ export default function LimitedTimeDeals() {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, []);
+  }, [deals]); // Add deals as dependency to recalculate when API data loads
 
   // Completely revised smooth scrolling implementation using requestAnimationFrame
   useEffect(() => {
@@ -447,7 +468,13 @@ export default function LimitedTimeDeals() {
 
   // Helper function to format price
   const formatPrice = (price: number) => {
-    return `₹${(price / 100000).toFixed(2)} Lac`;
+    if (price >= 10000000) {
+      return `₹${(price / 10000000).toFixed(2)} Cr`;
+    } else if (price >= 100000) {
+      return `₹${(price / 100000).toFixed(2)} Lac`;
+    } else {
+      return `₹${price.toLocaleString()}`;
+    }
   };
 
   // Helper function to format time left
@@ -682,7 +709,7 @@ export default function LimitedTimeDeals() {
                           {formatPrice(deal.discountedPrice)}
                         </span>
                         <span className="text-[10px] sm:text-xs text-gray-500 line-through">
-                          {formatPrice(deal.originalPrice)}
+                          {formatPrice(deal.price)}
                         </span>
                       </div>
 

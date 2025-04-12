@@ -211,7 +211,7 @@ export default function RecommendationsPage() {
                   onClick={() => trackPropertyView(property.id)}
                 >
                   <PropertyCard 
-                    property={property} 
+                    prop={property} 
                     isAiRecommended={true}
                   />
                 </Link>
@@ -261,7 +261,7 @@ export default function RecommendationsPage() {
                   to={`/property/${property.id}`}
                   onClick={() => trackPropertyView(property.id)}
                 >
-                  <PropertyCard property={property} />
+                  <PropertyCard prop={property} />
                 </Link>
               ))
             ) : (
@@ -303,7 +303,7 @@ export default function RecommendationsPage() {
                 to={`/property/${property.id}`}
                 onClick={() => trackPropertyView(property.id)}
               >
-                <PropertyCard property={property} />
+                <PropertyCard prop={property} />
               </Link>
             ))
           ) : (

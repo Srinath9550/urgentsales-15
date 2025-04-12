@@ -31,7 +31,9 @@ export async function hashPassword(password: string) {
 export async function sendEmailOTP(email: string, otp: string) {
   try {
     // Log the OTP for testing purposes in the console
+    console.log(`=========================================`);
     console.log(`EMAIL OTP for ${email}: ${otp}`);
+    console.log(`=========================================`);
 
     // Gmail SMTP setup with the provided credentials
     const transporter = nodemailer.createTransport({
@@ -40,7 +42,20 @@ export async function sendEmailOTP(email: string, otp: string) {
         user: "srinathballa20@gmail.com", // User provided email
         pass: "veou uoap olix rlqa", // User provided app password
       },
+      // Add timeout settings to prevent hanging connections
+      connectionTimeout: 10000, // 10 seconds
+      greetingTimeout: 10000,
+      socketTimeout: 15000,
     });
+
+    // Verify SMTP connection configuration
+    try {
+      await transporter.verify();
+      console.log("SMTP server connection verified successfully");
+    } catch (verifyError) {
+      console.error("SMTP connection verification failed:", verifyError);
+      // Continue anyway since we want to show the OTP in development
+    }
 
     // Email content
     const mailOptions = {
@@ -63,27 +78,51 @@ export async function sendEmailOTP(email: string, otp: string) {
       `,
     };
 
-    // Actually send the email using the provided credentials
-    const info = await transporter.sendMail(mailOptions);
-    console.log("Email sent: %s", info.messageId);
-
-    // Still display the OTP in the console for development
-    console.log(`=========================================`);
-    console.log(`OTP VERIFICATION CODE: ${otp}`);
-    console.log(`EMAIL: ${email}`);
-    console.log(`SENDING STATUS: Email sent successfully`);
-    console.log(`=========================================`);
-
-    return true;
+    // Try to send the email with a timeout
+    const sendMailPromise = transporter.sendMail(mailOptions);
+    
+    // Create a timeout promise
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error("Email sending timed out")), 20000); // 20 seconds timeout
+    });
+    
+    // Race the promises
+    const info = await Promise.race([sendMailPromise, timeoutPromise])
+      .catch(err => {
+        console.error("Email sending failed with error:", err);
+        return null;
+      });
+    
+    if (info) {
+      console.log("Email sent: %s", info.messageId);
+      
+      // Display the OTP in the console for development
+      console.log(`=========================================`);
+      console.log(`OTP VERIFICATION CODE: ${otp}`);
+      console.log(`EMAIL: ${email}`);
+      console.log(`SENDING STATUS: Email sent successfully`);
+      console.log(`=========================================`);
+      
+      return true;
+    } else {
+      throw new Error("Failed to send email - timeout or other error");
+    }
   } catch (error) {
     console.error("Error sending email:", error);
+    
     // Still display the OTP in the logs for testing purposes
     console.log(`=========================================`);
     console.log(`OTP VERIFICATION CODE: ${otp}`);
     console.log(`EMAIL: ${email}`);
     console.log(`SENDING STATUS: Failed - ${(error as Error).message}`);
+    console.log(`IMPORTANT: USE THIS OTP FOR TESTING: ${otp}`);
     console.log(`=========================================`);
-    return true; // Still return true to not block the flow
+    
+    // For development/testing purposes, we'll still return true
+    // In production, this should return false to indicate failure
+    console.log("WARNING: Email sending failed but returning true for testing purposes");
+    console.log("Use this OTP for testing:", otp);
+    return true;
   }
 }
 

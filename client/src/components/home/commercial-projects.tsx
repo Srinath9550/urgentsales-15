@@ -15,13 +15,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { CommercialProperty } from "@shared/schema";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { formatImageUrl, handleImageError } from "@/lib/image-utils";
 
 export default function CommercialProjects() {
   // Fetch commercial properties data
-  const { data: commercialProperties, isLoading } = useQuery<
-    CommercialProperty[]
-  >({
-    queryKey: ["/api/properties/commercial/featured"],
+  const { data: commercialProperties, isLoading } = useQuery<CommercialProperty[]>({
+    queryKey: ["/api/properties/commercial"],
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
 
@@ -375,14 +374,30 @@ interface CommercialPropertyCardProps {
 }
 
 function CommercialPropertyCard({ property }: CommercialPropertyCardProps) {
+  const [imageError, setImageError] = useState(false);
+  const placeholderImage = "/placeholder-property.jpg";
+  
   return (
     <div className="bg-white rounded-lg overflow-hidden shadow-md hover:shadow-lg transition-shadow duration-300">
       <div className="relative">
-        <img
-          src={property.imageUrl}
-          alt={property.title}
-          className="w-full h-32 sm:h-40 md:h-44 object-cover"
-        />
+        <div className="relative w-full h-32 sm:h-40 md:h-44">
+          {/* Skeleton loader while image is loading */}
+          <div className="absolute inset-0 bg-gray-200 animate-pulse"></div>
+          
+          <img
+            src={imageError ? placeholderImage : formatImageUrl(property.imageUrl)}
+            alt={property.title}
+            className="w-full h-full object-cover relative z-10"
+            onLoad={() => {
+              console.log(`Commercial property image loaded successfully:`, property.imageUrl);
+            }}
+            onError={(e) => {
+              console.log(`Error loading commercial property image:`, property.imageUrl);
+              setImageError(true);
+              handleImageError(e, placeholderImage);
+            }}
+          />
+        </div>
         <div className="absolute top-0 left-0 bg-black/70 text-white p-1 sm:p-2">
           <div className="text-xs sm:text-sm font-medium">
             {property.propertyType}

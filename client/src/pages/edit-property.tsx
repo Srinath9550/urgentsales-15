@@ -187,7 +187,7 @@ export default function EditProperty() {
       }
 
       return await apiRequest({
-        url: `/api/properties/${id}`,
+        url: `/api/properties/free/${id}`,
         method: "PATCH",
         body: propertyData
       });

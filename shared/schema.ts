@@ -41,10 +41,11 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// OTP for verification
+// OTP for verification (supports both registered users and guests)
 export const otps = pgTable("otps", {
   id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull(),
+  userId: integer("user_id").notNull(), // -1 for non-registered users
+  email: text("email"), // Store email for non-registered users
   otp: text("otp").notNull(),
   type: text("type").notNull(), // email, sms, whatsapp, property_booking
   expiresAt: timestamp("expires_at").notNull(),
@@ -174,6 +175,10 @@ export const propertyRecommendations = pgTable("property_recommendations", {
   propertyId: integer("property_id").notNull(),
   score: doublePrecision("score").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
+
+  contactName: text("contact_name"), // Optional contact name
+  contactEmail: text("contact_email"), // Optional contact email
+  contactPhone: text("contact_phone"),
 });
 
 // Property Views (for tracking user behavior and recommendations)

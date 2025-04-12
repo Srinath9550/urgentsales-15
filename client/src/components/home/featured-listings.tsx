@@ -69,8 +69,8 @@ export default function FeaturedListings() {
                 </div>
               ))
           ) : properties && properties.length > 0 ? (
-            properties.map((property) => (
-              <PropertyCard key={property.id} property={property} />
+            properties.map((prop) => (
+              <PropertyCard key={prop.id} prop={prop} />
             ))
           ) : (
             <div className="col-span-3 text-center py-8 text-gray-500">

@@ -17,6 +17,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { formatImageUrl, handleImageError } from "@/lib/image-utils";
 
 interface Project {
   id: string;
@@ -149,7 +150,7 @@ export default function UpcomingProjects() {
               Explore upcoming residential projects across top locations
             </p>
           </div>
-          <Link href="/projects/luxury">
+          <Link href="/projects">
             <Button
               variant="link"
               className="text-primary flex items-center gap-1 p-0 h-auto mt-2 md:mt-0"
@@ -319,15 +320,10 @@ function ProjectCard({ project }: ProjectCardProps) {
       <div className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300 overflow-hidden border border-gray-100 h-full group">
         <div className="relative">
           <img
-            src={project.imageUrl}
+            src={formatImageUrl(project.imageUrl)}
             alt={project.title}
             className="w-full h-40 sm:h-48 object-cover group-hover:scale-105 transition-transform duration-300"
-            onError={(e) => {
-              // Fallback image if the original fails to load
-              e.currentTarget.onerror = null;
-              e.currentTarget.src =
-                "https://images.unsplash.com/photo-1582407947304-fd86f028f716?w=500";
-            }}
+            onError={(e) => handleImageError(e)}
           />
           {project.featured && (
             <div className="absolute top-2 left-2 bg-yellow-500 text-white text-xs px-2 py-1 rounded-md">

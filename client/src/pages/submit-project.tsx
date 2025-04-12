@@ -283,10 +283,10 @@ export default function SubmitProjectPage() {
         const previewUrl = URL.createObjectURL(file);
         setHeroImagePreview(previewUrl);
 
-        // In a real app, you would upload this file to your server/cloud storage
-        // and then set the URL in the form
-        // For now, we'll just set a placeholder URL
-        form.setValue("heroImageUrl", "https://placeholder-url.com/image.jpg");
+        // We'll upload the file when the form is submitted
+        // Just set a temporary value for validation purposeswhen the form is submitted
+        // Just set a temporary value for validation purposes
+        form.setValue("heroImageUrl", "pending-upload");
       }
     },
     [form],
@@ -359,8 +359,8 @@ export default function SubmitProjectPage() {
   const onSubmit = async (data: ProjectFormValues) => {
     console.log("Form submission started with data:", data);
     setIsSubmitting(true);
-
-    // Validate required fields directly
+  
+    // Validate required fields
     if (!data.projectName) {
       toast({
         title: "Validation Error",
@@ -370,7 +370,7 @@ export default function SubmitProjectPage() {
       setIsSubmitting(false);
       return;
     }
-
+  
     if (!data.projectAddress) {
       toast({
         title: "Validation Error",
@@ -380,7 +380,7 @@ export default function SubmitProjectPage() {
       setIsSubmitting(false);
       return;
     }
-
+  
     if (!data.projectCategory) {
       toast({
         title: "Validation Error",
@@ -390,15 +390,16 @@ export default function SubmitProjectPage() {
       setIsSubmitting(false);
       return;
     }
-    
-    // Display progress toast to indicate submission is in progress
+  
+    // Show submission progress toast
     toast({
       title: "Submitting Project",
       description: "Please wait while we process your submission...",
     });
-
+  
     try {
       console.log("Validation passed, proceeding with submission");
+      
       // Filter out empty values
       const filteredData = {
         ...data,
@@ -406,199 +407,44 @@ export default function SubmitProjectPage() {
         bhk3Sizes: data.bhk3Sizes?.filter((size) => size.trim() !== "") || [],
         galleryUrls: data.galleryUrls?.filter((url) => url.trim() !== "") || [],
       };
-
-      // Prepare the data for submission according to the project schema
-      const projectSubmissionData = {
-        title: data.projectName,
-        description: data.aboutProject || "No description provided",
-        location: data.projectAddress,
-        city: data.projectAddress.split(",").pop()?.trim() || "Unknown",
-        state: "Not specified",
-        price: data.projectPrice,
-        bhkConfig: `${data.bhk2Sizes?.length ? "2" : ""}${data.bhk2Sizes?.length && data.bhk3Sizes?.length ? "," : ""}${data.bhk3Sizes?.length ? "3" : ""} BHK`,
-        builder: data.developerInfo || "Not specified",
-        category: data.projectCategory,
-        status: "upcoming",
-        amenities: data.amenities || [],
-        tags: [data.projectCategory],
-        // Only include valid URLs, actual files will be uploaded through formData
-        imageUrls: [data.heroImageUrl, ...(data.galleryUrls || [])].filter(
-          (url) => url && url.trim() !== "",
-        ),
-        contactNumber: user?.phone || "",
-        userId: user?.id || 1, // Default to guest user if not logged in
-      };
-
-      // Prepare form data for file upload
+  
+      // Prepare form data
       const formData = new FormData();
-
-      // Validate arrays for debugging
-      if (!Array.isArray(projectSubmissionData.amenities)) {
-        console.warn(
-          "Amenities is not an array:",
-          projectSubmissionData.amenities,
-        );
-        projectSubmissionData.amenities = [];
-      }
-
-      if (!Array.isArray(projectSubmissionData.tags)) {
-        console.warn("Tags is not an array:", projectSubmissionData.tags);
-        projectSubmissionData.tags = [];
-      }
-
-      if (!Array.isArray(projectSubmissionData.imageUrls)) {
-        console.warn(
-          "ImageUrls is not an array:",
-          projectSubmissionData.imageUrls,
-        );
-        projectSubmissionData.imageUrls = [];
-      }
-
-      // Add all the text data
-      Object.entries(projectSubmissionData).forEach(([key, value]) => {
+  
+      // Add project data
+      Object.entries(filteredData).forEach(([key, value]) => {
         if (Array.isArray(value)) {
-          // For arrays, we stringify them
           formData.append(key, JSON.stringify(value));
-          console.log(`Adding array field ${key}:`, JSON.stringify(value));
-          
-          // Special handling for imageUrls to ensure proper transmission
-          if (key === 'imageUrls') {
-            // Add a separate field for better server compatibility
-            formData.append('imageUrlsArray', JSON.stringify(value));
-            console.log('Added imageUrlsArray as JSON string:', JSON.stringify(value));
-          }
-        } else if (value !== undefined && value !== null) {
+        } else if (value !== null && value !== undefined) {
           formData.append(key, value.toString());
-
-          // Log important fields for debugging
-          if (key === "category" || key === "title" || key === "userId") {
-            console.log(`Adding field ${key}:`, value.toString());
-          }
         }
       });
-
-      // Add custom fields based on category
-      if (data.projectCategory) {
-        // Add category-specific data to the form
-        switch (data.projectCategory) {
-          case "luxury":
-            formData.append("premiumFeatures", data.premiumFeatures || "");
-            formData.append("exclusiveServices", data.exclusiveServices || "");
-            break;
-          case "affordable":
-            formData.append(
-              "affordabilityFeatures",
-              data.affordabilityFeatures || "",
-            );
-            formData.append("financialSchemes", data.financialSchemes || "");
-            break;
-          case "commercial":
-            formData.append("commercialType", data.commercialType || "");
-            formData.append("businessAmenities", data.businessAmenities || "");
-            break;
-          case "new_launch":
-            formData.append("launchDate", data.launchDate || "");
-            formData.append("launchOffers", data.launchOffers || "");
-            break;
-          case "upcoming":
-            formData.append(
-              "expectedCompletionDate",
-              data.expectedCompletionDate || "",
-            );
-            formData.append(
-              "constructionStatus",
-              data.constructionStatus || "",
-            );
-            break;
-          case "top_urgent":
-            formData.append("saleDeadline", data.saleDeadline || "");
-            formData.append("urgencyReason", data.urgencyReason || "");
-            formData.append("discountOffered", data.discountOffered || "");
-            break;
-          case "featured":
-            formData.append("highlightFeatures", data.highlightFeatures || "");
-            formData.append("accolades", data.accolades || "");
-            break;
-          case "newly_listed":
-            formData.append("listingDate", data.listingDate || "");
-            formData.append("specialIntroOffer", data.specialIntroOffer || "");
-            break;
-          case "company_projects":
-            formData.append("companyProfile", data.companyProfile || "");
-            formData.append("pastProjects", data.pastProjects || "");
-            break;
-        }
-      }
-
-      // Add the hero image if it exists
+  
+      // Add hero image
       if (heroImage) {
-        // Explicitly set the file name to help server identify it as hero image
+        console.log("Adding hero image file:", heroImage.name);
         formData.append("heroImage", heroImage);
       }
-
-      // Helper function to add additional gallery images if they're files
-      // This handles any gallery images that are actual files rather than URLs
-      const addGalleryFilesToFormData = () => {
-        // The implementation currently only accepts URL inputs for gallery images, not file uploads
-        // The heroImage is the only file being uploaded
-        
-        // If future implementation requires file uploads for gallery images,
-        // they would be added to formData here with unique field names
-        // Example: galleryFiles.forEach((file, index) => formData.append(`galleryImage_${index}`, file));
-      };
-
-      // Add any additional gallery images
-      addGalleryFilesToFormData();
-
-      console.log("Submitting project data:", projectSubmissionData);
-
-      // For preview, we'll set the form data first
-      setFormData(filteredData);
-      
-      // Process amenities specially to handle form arrays
-      if (Array.isArray(projectSubmissionData.amenities)) {
-        // Also store as a separate JSON key for extra compatibility
-        formData.append('amenitiesArray', JSON.stringify(projectSubmissionData.amenities));
-        console.log('Added amenitiesArray as JSON string:', JSON.stringify(projectSubmissionData.amenities));
+  
+      // Add gallery images
+      if (galleryFiles && galleryFiles.length > 0) {
+        galleryFiles.forEach((file) => {
+          formData.append('gallery', file);
+        });
       }
-      
-      // Add category to formData again just to make sure it's properly included
-      formData.append('category', data.projectCategory);
-      
-      // Set project name explicitly as both title and projectName
-      formData.append('title', data.projectName);
-      formData.append('projectName', data.projectName);
-      
-      // Add description field explicitly
-      formData.append('description', data.aboutProject || "No description provided");
-      
-      // Add address/location information
-      formData.append('location', data.projectAddress);
-      formData.append('city', data.projectAddress.split(",").pop()?.trim() || "Unknown");
-      
-      // Add amenities as a stringified JSON array
-      if (data.amenities && data.amenities.length > 0) {
-        formData.append('amenities', JSON.stringify(data.amenities));
-      }
-      
-      // Add price information
-      if (data.projectPrice) {
-        formData.append('price', data.projectPrice);
-      }
-      
-      // Make sure userId is included
+  
+      // Add user information
       if (user?.id) {
         formData.append('userId', user.id.toString());
       } else {
-        // Default to admin user if not logged in
-        formData.append('userId', "1");
+        formData.append('userId', "1"); // Default to admin user if not logged in
       }
-      
-      // Add status and approval status
+  
+      // Add status fields
       formData.append('status', 'upcoming');
       formData.append('approvalStatus', 'pending');
-
-      // Create a regular object for JSON submission as backup
+  
+      // Create backup JSON data
       const jsonData = {
         title: data.projectName,
         description: data.aboutProject || "No description provided",
@@ -617,26 +463,25 @@ export default function SubmitProjectPage() {
         userId: user?.id || 1,
         approvalStatus: "pending"
       };
-
+  
       console.log("Submitting form data:", Object.fromEntries(formData.entries()));
       console.log("JSON backup data:", jsonData);
-
-      // Submit the data to the server using FormData first
+  
+      // Submit the data to the server
       console.log("Starting fetch to /api/projects");
       let response;
       try {
         response = await fetch("/api/projects", {
           method: "POST",
-          body: formData, // FormData automatically sets the correct content-type
-          // Avoid cache for this request
+          body: formData,
           headers: {
             'Cache-Control': 'no-cache',
             'Pragma': 'no-cache'
           }
         });
-        
-        // If FormData submission fails, try the JSON approach
-        if (!response.ok && response.status !== 201) {
+  
+        // Fallback to JSON if FormData fails
+        if (!response.ok) {
           console.log("FormData submission failed, trying JSON approach");
           response = await fetch("/api/projects", {
             method: "POST",
@@ -650,8 +495,7 @@ export default function SubmitProjectPage() {
         }
       } catch (error) {
         console.error("Error during initial fetch:", error);
-        // Try the JSON approach as fallback
-        console.log("Error occurred, trying JSON approach as fallback");
+        // Fallback to JSON
         response = await fetch("/api/projects", {
           method: "POST",
           headers: {
@@ -662,54 +506,36 @@ export default function SubmitProjectPage() {
           body: JSON.stringify(jsonData)
         });
       }
+  
       console.log("Fetch completed with status:", response.status);
-      console.log(
-        "Server response headers:",
-        Object.fromEntries(response.headers.entries()),
-      );
-
+  
       if (!response.ok) {
         let errorMessage = "Failed to submit project";
         try {
           const errorData = await response.json();
           console.error("Server error response:", errorData);
           errorMessage = errorData.error || errorData.message || errorMessage;
-
           if (errorData.details) {
-            console.error("Error details:", errorData.details);
             errorMessage += ": " + errorData.details;
           }
         } catch (parseError) {
           console.error("Failed to parse error response", parseError);
-          // Try to get the text content if JSON parsing fails
-          try {
-            const textContent = await response.text();
-            console.error("Error response text:", textContent);
-          } catch (textError) {
-            console.error("Failed to get response text:", textError);
-          }
         }
         throw new Error(errorMessage);
       }
-
-      let result;
-      try {
-        result = await response.json();
-        console.log("Server success response:", result);
-      } catch (parseError) {
-        console.error("Failed to parse success response", parseError);
-        throw new Error("Server returned invalid response format");
-      }
-
+  
+      const result = await response.json();
+      console.log("Server success response:", result);
+  
       // Set the submitted project ID
-      if (result.project && result.project.id) {
+      if (result.project?.id) {
         setSubmittedProjectId(result.project.id);
+      } else if (result.id) {
+        setSubmittedProjectId(result.id);
       }
-
-      // Show success popup
+  
+      // Show success UI
       setShowSuccessDialog(true);
-
-      // Also show toast notification
       toast({
         title: "Project submitted successfully",
         description: "Your project has been sent for review and approval",
@@ -718,16 +544,392 @@ export default function SubmitProjectPage() {
       console.error("Error submitting project:", error);
       toast({
         title: "Error submitting project",
-        description:
-          error instanceof Error
-            ? error.message
-            : "An unexpected error occurred",
+        description: error instanceof Error ? error.message : "An unexpected error occurred",
         variant: "destructive",
       });
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  // const onSubmit = async (data: ProjectFormValues) => {
+  //   console.log("Form submission started with data:", data);
+  //   setIsSubmitting(true);
+
+  //   // Validate required fields directly
+  //   if (!data.projectName) {
+  //     toast({
+  //       title: "Validation Error",
+  //       description: "Project name is required",
+  //       variant: "destructive",
+  //     });
+  //     setIsSubmitting(false);
+  //     return;
+  //   }
+
+  //   if (!data.projectAddress) {
+  //     toast({
+  //       title: "Validation Error",
+  //       description: "Project address is required",
+  //       variant: "destructive",
+  //     });
+  //     setIsSubmitting(false);
+  //     return;
+  //   }
+
+  //   if (!data.projectCategory) {
+  //     toast({
+  //       title: "Validation Error",
+  //       description: "Please select a project category",
+  //       variant: "destructive",
+  //     });
+  //     setIsSubmitting(false);
+  //     return;
+  //   }
+    
+  //   // Display progress toast to indicate submission is in progress
+  //   toast({
+  //     title: "Submitting Project",
+  //     description: "Please wait while we process your submission...",
+  //   });
+
+  //   try {
+  //     console.log("Validation passed, proceeding with submission");
+  //     // Filter out empty values
+  //     const filteredData = {
+  //       ...data,
+  //       bhk2Sizes: data.bhk2Sizes?.filter((size) => size.trim() !== "") || [],
+  //       bhk3Sizes: data.bhk3Sizes?.filter((size) => size.trim() !== "") || [],
+  //       galleryUrls: data.galleryUrls?.filter((url) => url.trim() !== "") || [],
+  //     };
+
+  //     // Prepare the data for submission according to the project schema
+  //     const projectSubmissionData = {
+  //       title: data.projectName,
+  //       description: data.aboutProject || "No description provided",
+  //       location: data.projectAddress,
+  //       city: data.projectAddress.split(",").pop()?.trim() || "Unknown",
+  //       state: "Not specified",
+  //       price: data.projectPrice,
+  //       bhkConfig: `${data.bhk2Sizes?.length ? "2" : ""}${data.bhk2Sizes?.length && data.bhk3Sizes?.length ? "," : ""}${data.bhk3Sizes?.length ? "3" : ""} BHK`,
+  //       builder: data.developerInfo || "Not specified",
+  //       category: data.projectCategory,
+  //       status: "upcoming",
+  //       amenities: data.amenities || [],
+  //       tags: [data.projectCategory],
+  //       // Only include valid URLs, actual files will be uploaded through formData
+  //       imageUrls: [data.heroImageUrl, ...(data.galleryUrls || [])].filter(
+  //         (url) => url && url.trim() !== "",
+  //       ),
+  //       contactNumber: user?.phone || "",
+  //       userId: user?.id || 1, // Default to guest user if not logged in
+  //     };
+
+  //     // Prepare form data for file upload
+  //     const formData = new FormData();
+
+  //     // Validate arrays for debugging
+  //     if (!Array.isArray(projectSubmissionData.amenities)) {
+  //       console.warn(
+  //         "Amenities is not an array:",
+  //         projectSubmissionData.amenities,
+  //       );
+  //       projectSubmissionData.amenities = [];
+  //     }
+
+  //     if (!Array.isArray(projectSubmissionData.tags)) {
+  //       console.warn("Tags is not an array:", projectSubmissionData.tags);
+  //       projectSubmissionData.tags = [];
+  //     }
+
+  //     if (!Array.isArray(projectSubmissionData.imageUrls)) {
+  //       console.warn(
+  //         "ImageUrls is not an array:",
+  //         projectSubmissionData.imageUrls,
+  //       );
+  //       projectSubmissionData.imageUrls = [];
+  //     }
+
+  //     // Add hero image file if it exists
+  //     if (heroImage) {
+  //       console.log("Adding hero image file:", heroImage.name);
+  //       formData.append("heroImage", heroImage);
+  //     }
+
+  //     // Add all the text data
+  //     Object.entries(projectSubmissionData).forEach(([key, value]) => {
+  //       if (Array.isArray(value)) {
+  //         // For arrays, we stringify them
+  //         formData.append(key, JSON.stringify(value));
+  //         console.log(`Adding array field ${key}:`, JSON.stringify(value));
+          
+  //         // Special handling for imageUrls to ensure proper transmission
+  //         if (key === 'imageUrls') {
+  //           // Add a separate field for better server compatibility
+  //           formData.append('imageUrlsArray', JSON.stringify(value));
+  //           console.log('Added imageUrlsArray as JSON string:', JSON.stringify(value));
+  //         }
+  //       } else if (value !== undefined && value !== null) {
+  //         formData.append(key, value.toString());
+
+  //         // Log important fields for debugging
+  //         if (key === "category" || key === "title" || key === "userId") {
+  //           console.log(`Adding field ${key}:`, value.toString());
+  //         }
+  //       }
+  //     });
+
+  //     // Add custom fields based on category
+  //     if (data.projectCategory) {
+  //       // Add category-specific data to the form
+  //       switch (data.projectCategory) {
+  //         case "luxury":
+  //           formData.append("premiumFeatures", data.premiumFeatures || "");
+  //           formData.append("exclusiveServices", data.exclusiveServices || "");
+  //           break;
+  //         case "affordable":
+  //           formData.append(
+  //             "affordabilityFeatures",
+  //             data.affordabilityFeatures || "",
+  //           );
+  //           formData.append("financialSchemes", data.financialSchemes || "");
+  //           break;
+  //         case "commercial":
+  //           formData.append("commercialType", data.commercialType || "");
+  //           formData.append("businessAmenities", data.businessAmenities || "");
+  //           break;
+  //         case "new_launch":
+  //           formData.append("launchDate", data.launchDate || "");
+  //           formData.append("launchOffers", data.launchOffers || "");
+  //           break;
+  //         case "upcoming":
+  //           formData.append(
+  //             "expectedCompletionDate",
+  //             data.expectedCompletionDate || "",
+  //           );
+  //           formData.append(
+  //             "constructionStatus",
+  //             data.constructionStatus || "",
+  //           );
+  //           break;
+  //         case "top_urgent":
+  //           formData.append("saleDeadline", data.saleDeadline || "");
+  //           formData.append("urgencyReason", data.urgencyReason || "");
+  //           formData.append("discountOffered", data.discountOffered || "");
+  //           break;
+  //         case "featured":
+  //           formData.append("highlightFeatures", data.highlightFeatures || "");
+  //           formData.append("accolades", data.accolades || "");
+  //           break;
+  //         case "newly_listed":
+  //           formData.append("listingDate", data.listingDate || "");
+  //           formData.append("specialIntroOffer", data.specialIntroOffer || "");
+  //           break;
+  //         case "company_projects":
+  //           formData.append("companyProfile", data.companyProfile || "");
+  //           formData.append("pastProjects", data.pastProjects || "");
+  //           break;
+  //       }
+  //     }
+
+  //     // Add the hero image if it exists
+  //     if (heroImage) {
+  //       // Explicitly set the file name to help server identify it as hero image
+  //       formData.append("heroImage", heroImage);
+  //     }
+
+  //     // Helper function to add additional gallery images if they're files
+  //     // This handles any gallery images that are actual files rather than URLs
+  //     const addGalleryFilesToFormData = () => {
+  //       // The implementation currently only accepts URL inputs for gallery images, not file uploads
+  //       // The heroImage is the only file being uploaded
+        
+  //       // If future implementation requires file uploads for gallery images,
+  //       // they would be added to formData here with unique field names
+  //       // Example: galleryFiles.forEach((file, index) => formData.append(`galleryImage_${index}`, file));
+  //     };
+
+  //     // Add any additional gallery images
+  //     addGalleryFilesToFormData();
+
+  //     console.log("Submitting project data:", projectSubmissionData);
+
+  //     // For preview, we'll set the form data first
+  //     setFormData(filteredData);
+      
+  //     // Process amenities specially to handle form arrays
+  //     if (Array.isArray(projectSubmissionData.amenities)) {
+  //       // Also store as a separate JSON key for extra compatibility
+  //       formData.append('amenitiesArray', JSON.stringify(projectSubmissionData.amenities));
+  //       console.log('Added amenitiesArray as JSON string:', JSON.stringify(projectSubmissionData.amenities));
+  //     }
+      
+  //     // Add category to formData again just to make sure it's properly included
+  //     formData.append('category', data.projectCategory);
+      
+  //     // Set project name explicitly as both title and projectName
+  //     formData.append('title', data.projectName);
+  //     formData.append('projectName', data.projectName);
+      
+  //     // Add description field explicitly
+  //     formData.append('description', data.aboutProject || "No description provided");
+      
+  //     // Add address/location information
+  //     formData.append('location', data.projectAddress);
+  //     formData.append('city', data.projectAddress.split(",").pop()?.trim() || "Unknown");
+      
+  //     // Add amenities as a stringified JSON array
+  //     if (data.amenities && data.amenities.length > 0) {
+  //       formData.append('amenities', JSON.stringify(data.amenities));
+  //     }
+      
+  //     // Add price information
+  //     if (data.projectPrice) {
+  //       formData.append('price', data.projectPrice);
+  //     }
+      
+  //     // Make sure userId is included
+  //     if (user?.id) {
+  //       formData.append('userId', user.id.toString());
+  //     } else {
+  //       // Default to admin user if not logged in
+  //       formData.append('userId', "1");
+  //     }
+      
+  //     // Add status and approval status
+  //     formData.append('status', 'upcoming');
+  //     formData.append('approvalStatus', 'pending');
+
+  //     // Create a regular object for JSON submission as backup
+  //     const jsonData = {
+  //       title: data.projectName,
+  //       description: data.aboutProject || "No description provided",
+  //       location: data.projectAddress,
+  //       city: data.projectAddress.split(",").pop()?.trim() || "Unknown",
+  //       state: "Not specified",
+  //       price: data.projectPrice,
+  //       bhkConfig: `${data.bhk2Sizes?.length ? "2" : ""}${data.bhk2Sizes?.length && data.bhk3Sizes?.length ? "," : ""}${data.bhk3Sizes?.length ? "3" : ""} BHK`,
+  //       builder: data.developerInfo || "Not specified",
+  //       category: data.projectCategory,
+  //       status: "upcoming",
+  //       amenities: data.amenities || [],
+  //       tags: [data.projectCategory],
+  //       imageUrls: [data.heroImageUrl, ...(data.galleryUrls || [])].filter(url => url && url.trim() !== ""),
+  //       contactNumber: user?.phone || "",
+  //       userId: user?.id || 1,
+  //       approvalStatus: "pending"
+  //     };
+
+  //     console.log("Submitting form data:", Object.fromEntries(formData.entries()));
+  //     console.log("JSON backup data:", jsonData);
+
+  //     // Submit the data to the server using FormData first
+  //     console.log("Starting fetch to /api/projects");
+  //     let response;
+  //     try {
+  //       response = await fetch("/api/projects", {
+  //         method: "POST",
+  //         body: formData, // FormData automatically sets the correct content-type
+  //         // Avoid cache for this request
+  //         headers: {
+  //           'Cache-Control': 'no-cache',
+  //           'Pragma': 'no-cache'
+  //         }
+  //       });
+        
+  //       // If FormData submission fails, try the JSON approach
+  //       if (!response.ok && response.status !== 201) {
+  //         console.log("FormData submission failed, trying JSON approach");
+  //         response = await fetch("/api/projects", {
+  //           method: "POST",
+  //           headers: {
+  //             'Content-Type': 'application/json',
+  //             'Cache-Control': 'no-cache',
+  //             'Pragma': 'no-cache'
+  //           },
+  //           body: JSON.stringify(jsonData)
+  //         });
+  //       }
+  //     } catch (error) {
+  //       console.error("Error during initial fetch:", error);
+  //       // Try the JSON approach as fallback
+  //       console.log("Error occurred, trying JSON approach as fallback");
+  //       response = await fetch("/api/projects", {
+  //         method: "POST",
+  //         headers: {
+  //           'Content-Type': 'application/json',
+  //           'Cache-Control': 'no-cache',
+  //           'Pragma': 'no-cache'
+  //         },
+  //         body: JSON.stringify(jsonData)
+  //       });
+  //     }
+  //     console.log("Fetch completed with status:", response.status);
+  //     console.log(
+  //       "Server response headers:",
+  //       Object.fromEntries(response.headers.entries()),
+  //     );
+
+  //     if (!response.ok) {
+  //       let errorMessage = "Failed to submit project";
+  //       try {
+  //         const errorData = await response.json();
+  //         console.error("Server error response:", errorData);
+  //         errorMessage = errorData.error || errorData.message || errorMessage;
+
+  //         if (errorData.details) {
+  //           console.error("Error details:", errorData.details);
+  //           errorMessage += ": " + errorData.details;
+  //         }
+  //       } catch (parseError) {
+  //         console.error("Failed to parse error response", parseError);
+  //         // Try to get the text content if JSON parsing fails
+  //         try {
+  //           const textContent = await response.text();
+  //           console.error("Error response text:", textContent);
+  //         } catch (textError) {
+  //           console.error("Failed to get response text:", textError);
+  //         }
+  //       }
+  //       throw new Error(errorMessage);
+  //     }
+
+  //     let result;
+  //     try {
+  //       result = await response.json();
+  //       console.log("Server success response:", result);
+  //     } catch (parseError) {
+  //       console.error("Failed to parse success response", parseError);
+  //       throw new Error("Server returned invalid response format");
+  //     }
+
+  //     // Set the submitted project ID
+  //     if (result.project && result.project.id) {
+  //       setSubmittedProjectId(result.project.id);
+  //     }
+
+  //     // Show success popup
+  //     setShowSuccessDialog(true);
+
+  //     // Also show toast notification
+  //     toast({
+  //       title: "Project submitted successfully",
+  //       description: "Your project has been sent for review and approval",
+  //     });
+  //   } catch (error) {
+  //     console.error("Error submitting project:", error);
+  //     toast({
+  //       title: "Error submitting project",
+  //       description:
+  //         error instanceof Error
+  //           ? error.message
+  //           : "An unexpected error occurred",
+  //       variant: "destructive",
+  //     });
+  //   } finally {
+  //     setIsSubmitting(false);
+  //   }
+  // };
 
   // Calculate EMI for home loan
   const calculateEMI = (amount: string, rate: string, tenure: string) => {

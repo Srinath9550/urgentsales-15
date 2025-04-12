@@ -16,6 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent } from "@/components/ui/card";
+import { formatImageUrl, handleImageError } from "@/lib/image-utils";
 
 interface LuxuryProject {
   id: string;
@@ -200,14 +201,10 @@ export default function LuxuryProjects() {
               >
                 <div className="relative w-full md:w-96 h-64 md:h-auto">
                   <img
-                    src={project.imageUrl}
+                    src={formatImageUrl(project.imageUrl)}
                     alt={project.title}
                     className="w-full h-full object-cover"
-                    onError={(e) => {
-                      e.currentTarget.onerror = null;
-                      e.currentTarget.src =
-                        "https://images.unsplash.com/photo-1582407947304-fd86f028f716?w=500";
-                    }}
+                    onError={(e) => handleImageError(e)}
                   />
                   {project.featured && (
                     <div className="absolute top-3 left-3 bg-yellow-500 text-white text-xs px-2 py-1 rounded-md">

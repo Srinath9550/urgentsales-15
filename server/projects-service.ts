@@ -369,7 +369,9 @@ export async function submitProject(req: Request, res: Response) {
     // Handle single file uploads (e.g., req.file from multer single)
     if (req.file) {
       console.log("Processing single file upload:", req.file.filename);
-      uploadedImageUrls.push(getFileUrl(req.file.filename, fileUserId));
+      const fileUrl = getFileUrl(req.file.filename, fileUserId);
+      uploadedImageUrls.push(fileUrl);
+      console.log("Generated URL for single file:", fileUrl);
     }
     
     // Handle multiple file uploads (e.g., req.files from multer array/fields)
@@ -381,12 +383,13 @@ export async function submitProject(req: Request, res: Response) {
       if (Array.isArray(req.files)) {
         // It's an array of files
         console.log(`Processing ${req.files.length} files in array`);
-        uploadedImageUrls = uploadedImageUrls.concat(
-          (req.files as Express.Multer.File[]).map(file => {
-            console.log(`  - Array file: ${file.filename}`);
-            return getFileUrl(file.filename, fileUserId);
-          })
-        );
+        const fileUrls = (req.files as Express.Multer.File[]).map(file => {
+          console.log(`  - Array file: ${file.filename}`);
+          const fileUrl = getFileUrl(file.filename, fileUserId);
+          console.log(`    Generated URL: ${fileUrl}`);
+          return fileUrl;
+        });
+        uploadedImageUrls = uploadedImageUrls.concat(fileUrls);
       } else {
         // It's an object with field names as keys
         const filesObj = req.files as { [fieldname: string]: Express.Multer.File[] };
@@ -399,12 +402,25 @@ export async function submitProject(req: Request, res: Response) {
           if (Array.isArray(fieldFiles)) {
             fieldFiles.forEach(file => {
               console.log(`  - Field file: ${file.filename} (${fieldname})`);
-              uploadedImageUrls.push(getFileUrl(file.filename, fileUserId));
+              const fileUrl = getFileUrl(file.filename, fileUserId);
+              console.log(`    Generated URL: ${fileUrl}`);
+              uploadedImageUrls.push(fileUrl);
+              
+              // Special handling for heroImage
+              if (fieldname === 'heroImage') {
+                console.log("Setting heroImage as first in imageUrls array");
+                // Move hero image to the beginning of the array
+                uploadedImageUrls = uploadedImageUrls.filter(url => url !== fileUrl);
+                uploadedImageUrls.unshift(fileUrl);
+              }
             });
           }
         });
       }
     }
+    
+    // Log all uploaded image URLs
+    console.log("All uploaded image URLs:", uploadedImageUrls);
     
     // Add uploaded images to the request body
     if (uploadedImageUrls.length > 0) {

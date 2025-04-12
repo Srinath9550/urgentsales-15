@@ -55,6 +55,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { queryClient, apiRequest } from "@/lib/query-client";
 import { Slider } from "@/components/ui/slider";
 import NotFound from "@/pages/not-found";
+import { formatImageUrl, handleImageError } from "@/lib/image-utils";
 
 interface Project {
   id: number;
@@ -374,9 +375,22 @@ const ProjectDetailPage = () => {
   };
 
   const openImageModal = (imageUrl: string) => {
-    setModalImage(imageUrl);
-    setIsImageModalOpen(true);
-    document.body.style.overflow = 'hidden';
+    if (imageUrl && typeof imageUrl === 'string' && imageUrl.trim() !== '') {
+      // Format the URL using our utility function
+      const formattedUrl = formatImageUrl(imageUrl);
+      console.log(`Opening image modal with URL: ${formattedUrl}`);
+      
+      setModalImage(formattedUrl);
+      setIsImageModalOpen(true);
+      document.body.style.overflow = 'hidden';
+    } else {
+      console.log("Invalid image URL:", imageUrl);
+      toast({
+        title: "Image Error",
+        description: "Could not open image. The URL is invalid.",
+        variant: "destructive",
+      });
+    }
   };
 
   const closeImageModal = () => {
@@ -480,7 +494,26 @@ const ProjectDetailPage = () => {
     return <NotFound />;
   }
 
-  const mainImage = project.imageUrls?.[0] || project.imageUrl || "/placeholder-project.jpg";
+  // Get the main image with proper validation
+  const getMainImage = () => {
+    // Check if imageUrls is a valid array with at least one valid URL
+    if (project.imageUrls && Array.isArray(project.imageUrls) && project.imageUrls.length > 0) {
+      const validUrls = project.imageUrls.filter(url => url && typeof url === 'string' && url.trim() !== '');
+      if (validUrls.length > 0) {
+        return formatImageUrl(validUrls[0]);
+      }
+    }
+    
+    // Fallback to imageUrl if available
+    if (project.imageUrl && typeof project.imageUrl === 'string' && project.imageUrl.trim() !== '') {
+      return formatImageUrl(project.imageUrl);
+    }
+    
+    // Default placeholder
+    return "/placeholder-project.jpg";
+  };
+  
+  const mainImage = getMainImage();
 
   return (
     <>
@@ -887,91 +920,125 @@ const ProjectDetailPage = () => {
             )}
 
             {/* Gallery Section */}
-            {project.imageUrls && project.imageUrls.length > 0 && (
-              <motion.div 
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: 0.3 }}
-                ref={sectionRefs.gallery} 
-                className="bg-white rounded-lg shadow-sm border p-4 sm:p-6 mb-6 sm:mb-8"
-              >
-                <h2 className="text-xl sm:text-2xl font-bold mb-6">GALLERY</h2>
-                
-                <div className="relative">
-                  {/* Scrollable Gallery Container with Touch Slide */}
-                  <div 
-                    id="gallery-container"
-                    className="overflow-x-auto pb-4 scrollbar-hide touch-pan-x"
-                    ref={(el) => {
-                      if (el) {
-                        // Enable auto-sliding
-                        const autoSlideInterval = setInterval(() => {
-                          if (el && !el.matches(':hover')) {
-                            el.scrollBy({ left: 320, behavior: 'smooth' });
-                            // Reset to beginning when reaching the end
-                            if (el.scrollLeft + el.clientWidth >= el.scrollWidth - 10) {
-                              setTimeout(() => {
-                                el.scrollTo({ left: 0, behavior: 'smooth' });
-                              }, 1000);
-                            }
-                          }
-                        }, 5000);
-                        
-                        // Clean up interval when component unmounts
-                        return () => clearInterval(autoSlideInterval);
+            {(() => {
+              // Validate image URLs
+              const validImageUrls = project.imageUrls && Array.isArray(project.imageUrls) 
+                ? project.imageUrls
+                    .filter(url => url && typeof url === 'string' && url.trim() !== '')
+                    .map(url => {
+                      // Handle relative URLs by prepending the base URL if needed
+                      if (url.startsWith('/')) {
+                        return `${window.location.origin}${url}`;
                       }
-                    }}
+                      return url;
+                    })
+                    .map(url => {
+                      // Handle relative URLs by prepending the base URL if needed
+                      if (url.startsWith('/')) {
+                        return `${window.location.origin}${url}`;
+                      }
+                      return url;
+                    })
+                : [];
+                
+              if (validImageUrls.length > 0) {
+                return (
+                  <motion.div 
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, delay: 0.3 }}
+                    ref={sectionRefs.gallery} 
+                    className="bg-white rounded-lg shadow-sm border p-4 sm:p-6 mb-6 sm:mb-8"
                   >
-                    <div className="flex gap-4">
-                      {project.imageUrls.map((imageUrl, index) => (
-                        <div 
-                          key={index} 
-                          className="relative min-w-[280px] sm:min-w-[320px] aspect-[4/3] rounded-lg overflow-hidden cursor-pointer hover:opacity-90 transition-opacity flex-shrink-0"
-                          onClick={() => openImageModal(imageUrl)}
-                        >
-                          <img 
-                            src={imageUrl} 
-                            alt={`${project.title} - Image ${index + 1}`} 
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement;
-                              target.onerror = null;
-                              target.src = "/placeholder-project.jpg";
-                            }}
-                          />
+                    <h2 className="text-xl sm:text-2xl font-bold mb-6">GALLERY</h2>
+                    
+                    <div className="relative">
+                      {/* Scrollable Gallery Container with Touch Slide */}
+                      <div 
+                        id="gallery-container"
+                        className="overflow-x-auto pb-4 scrollbar-hide touch-pan-x"
+                        ref={(el) => {
+                          if (el) {
+                            // Enable auto-sliding
+                            const autoSlideInterval = setInterval(() => {
+                              if (el && !el.matches(':hover')) {
+                                el.scrollBy({ left: 320, behavior: 'smooth' });
+                                // Reset to beginning when reaching the end
+                                if (el.scrollLeft + el.clientWidth >= el.scrollWidth - 10) {
+                                  setTimeout(() => {
+                                    el.scrollTo({ left: 0, behavior: 'smooth' });
+                                  }, 1000);
+                                }
+                              }
+                            }, 5000);
+                            
+                            // Clean up interval when component unmounts
+                            return () => clearInterval(autoSlideInterval);
+                          }
+                        }}
+                      >
+                        <div className="flex gap-4">
+                          {validImageUrls.map((imageUrl, index) => (
+                            <div 
+                              key={index} 
+                              className="relative min-w-[280px] sm:min-w-[320px] aspect-[4/3] rounded-lg overflow-hidden cursor-pointer hover:opacity-90 transition-opacity flex-shrink-0"
+                              onClick={() => openImageModal(imageUrl)}
+                            >
+                              <img 
+                                src={imageUrl} 
+                                alt={`${project.title} - Image ${index + 1}`} 
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  console.log(`Error loading image at index ${index}:`, imageUrl);
+                                  const target = e.target as HTMLImageElement;
+                                  target.onerror = null;
+                                  
+                                  // Try with origin prepended if it's a relative URL
+                                  if (imageUrl.startsWith('/') && !imageUrl.startsWith(`${window.location.origin}/`)) {
+                                    const fullUrl = `${window.location.origin}${imageUrl}`;
+                                    console.log(`Trying with full URL: ${fullUrl}`);
+                                    target.src = fullUrl;
+                                  } else {
+                                    target.src = "/placeholder-project.jpg";
+                                  }
+                                }}
+                              />
+                            </div>
+                          ))}
                         </div>
-                      ))}
+                      </div>
                     </div>
-                  </div>
-                </div>
-                
-                {/* Thumbnail Navigation Indicators */}
-                <div className="mt-4 flex justify-center gap-2">
-                  {project.imageUrls.slice(0, 5).map((_, index) => (
-                    <button
-                      key={index}
-                      className={`w-2 h-2 rounded-full ${index === 0 ? 'bg-primary' : 'bg-gray-300'} transition-colors duration-300`}
-                      onClick={() => {
-                        const container = document.getElementById('gallery-container');
-                        const items = document.querySelectorAll('#gallery-container > div > div');
-                        if (container && items[index]) {
-                          const scrollLeft = (items[index] as HTMLElement).offsetLeft - container.offsetLeft;
-                          container.scrollTo({ left: scrollLeft, behavior: 'smooth' });
-                        }
-                      }}
-                    />
-                  ))}
-                  {project.imageUrls.length > 5 && (
-                    <span className="text-xs text-gray-500">+{project.imageUrls.length - 5}</span>
-                  )}
-                </div>
-                
-                {/* Touch Slide Hint - Only visible on mobile */}
-                <div className="mt-2 text-center text-xs text-gray-500 sm:hidden">
-                  <span>← Swipe to view more →</span>
-                </div>
-              </motion.div>
-            )}
+                    
+                    {/* Thumbnail Navigation Indicators */}
+                    <div className="mt-4 flex justify-center gap-2">
+                      {validImageUrls.slice(0, 5).map((_, index) => (
+                        <button
+                          key={index}
+                          className={`w-2 h-2 rounded-full ${index === 0 ? 'bg-primary' : 'bg-gray-300'} transition-colors duration-300`}
+                          onClick={() => {
+                            const container = document.getElementById('gallery-container');
+                            const items = document.querySelectorAll('#gallery-container > div > div');
+                            if (container && items[index]) {
+                              const scrollLeft = (items[index] as HTMLElement).offsetLeft - container.offsetLeft;
+                              container.scrollTo({ left: scrollLeft, behavior: 'smooth' });
+                            }
+                          }}
+                        />
+                      ))}
+                      {validImageUrls.length > 5 && (
+                        <span className="text-xs text-gray-500">+{validImageUrls.length - 5}</span>
+                      )}
+                    </div>
+                    
+                    {/* Touch Slide Hint - Only visible on mobile */}
+                    <div className="mt-2 text-center text-xs text-gray-500 sm:hidden">
+                      <span>← Swipe to view more →</span>
+                    </div>
+                  </motion.div>
+                );
+              }
+              return null;
+            })()}
 
             {/* Specifications Section */}
             {enhancedProject.specifications && enhancedProject.specifications.length > 0 && (
@@ -1513,77 +1580,36 @@ const ProjectDetailPage = () => {
                 </CardContent>
               </Card>
 
-              {/* Quick Enquiry Form */}
-              {/* <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg sm:text-xl">Quick Enquiry</CardTitle>
-                  <CardDescription className="text-xs sm:text-sm">
-                    Fill the form for more details
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <form className="space-y-3 sm:space-y-4" onSubmit={handleEnquirySubmit}>
-                    <div>
-                      <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Name</label>
-                      <input 
-                        type="text" 
-                        name="name"
-                        value={enquiryForm.name}
-                        onChange={handleEnquiryChange}
-                        className="w-full px-2 sm:px-3 py-1 sm:py-2 text-xs sm:text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
-                        placeholder="Your name"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Email</label>
-                      <input 
-                        type="email" 
-                        name="email"
-                        value={enquiryForm.email}
-                        onChange={handleEnquiryChange}
-                        className="w-full px-2 sm:px-3 py-1 sm:py-2 text-xs sm:text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
-                        placeholder="Your email"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Phone</label>
-                      <input 
-                        type="tel" 
-                        name="phone"
-                        value={enquiryForm.phone}
-                        onChange={handleEnquiryChange}
-                        className="w-full px-2 sm:px-3 py-1 sm:py-2 text-xs sm:text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
-                        placeholder="Your phone number"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Message</label>
-                      <textarea 
-                        name="message"
-                        value={enquiryForm.message}
-                        onChange={handleEnquiryChange}
-                        className="w-full px-2 sm:px-3 py-1 sm:py-2 text-xs sm:text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
-                        rows={3}
-                        placeholder="Your message or query"
-                      ></textarea>
-                    </div>
-                    <Button 
-                      type="submit" 
-                      className="w-full text-xs sm:text-sm"
-                      disabled={isSubmitting}
-                    >
-                      {isSubmitting ? 'Submitting...' : 'Submit Enquiry'}
-                    </Button>
-                  </form>
-                </CardContent>
-              </Card> */}
+              {/* Quick Enquiry Form - Removed for now */}
             </div>
           </div>
         </div>
       </div>
+
+      {/* Image Modal */}
+      {isImageModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black bg-opacity-90 flex items-center justify-center p-4">
+          <div className="relative w-full max-w-4xl mx-auto">
+            {/* Close button */}
+            <button 
+              onClick={closeImageModal}
+              className="absolute top-2 right-2 z-10 bg-black bg-opacity-50 text-white p-2 rounded-full hover:bg-opacity-70 transition-all"
+            >
+              <X className="h-6 w-6" />
+            </button>
+            
+            {/* Image */}
+            <div className="relative w-full h-[80vh] flex items-center justify-center">
+              <img 
+                src={modalImage} 
+                alt="Enlarged view" 
+                className="max-w-full max-h-full object-contain"
+                onError={(e) => handleImageError(e)}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };

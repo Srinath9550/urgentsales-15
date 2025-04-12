@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+// Remove the timeout parameter which is not supported by our apiRequest function
 
 export interface FileWithPreview {
   file: File;
@@ -113,12 +114,15 @@ export default function FileUpload({
       const fileWithPreview: FileWithPreview = {
         file: file,
         id: generateFileId(),
+        name: file.name,
+        size: file.size,
+        type: file.type,
         preview: URL.createObjectURL(file),
         uploadProgress: 0,
         status: 'uploading' as const
       };
 
-      // Simulate upload progress
+      // Start upload immediately
       simulateUploadProgress(fileWithPreview);
 
       newFiles.push(fileWithPreview);
@@ -180,14 +184,40 @@ export default function FileUpload({
         )
       );
       
+      // Add a delay to ensure the UI updates
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
       // Upload file to server
       console.log('Uploading file to server:', file.file.name);
-      const responseData = await apiRequest<{ files: string[] }>({
-        url: '/api/upload/property-images',
-        method: 'POST',
-        body: formData,
-        headers: {} // Let the browser set the correct content-type for form data
-      });
+      
+      // Log the form data for debugging
+      console.log('FormData contents:');
+      for (const pair of formData.entries()) {
+        console.log(pair[0], pair[1]);
+      }
+      
+      // Make the API request with explicit timeout and retry
+      let retries = 2;
+      let responseData = null;
+      
+      while (retries >= 0 && !responseData) {
+        try {
+          responseData = await apiRequest<{ success: boolean, files: string[] }>({
+            url: '/api/upload/property-images',
+            method: 'POST',
+            body: formData,
+            headers: {} // Let the browser set the correct content-type for form data
+          });
+          
+          console.log('Upload response:', responseData);
+        } catch (uploadError) {
+          console.error(`Upload attempt failed (${retries} retries left):`, uploadError);
+          if (retries <= 0) throw uploadError;
+          retries--;
+          // Wait before retrying
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
       
       if (responseData && responseData.files && responseData.files.length > 0) {
         console.log('File uploaded successfully. Server URL:', responseData.files[0]);
@@ -206,12 +236,16 @@ export default function FileUpload({
           );
           
           // Notify parent component about the updated files
-          onFilesSelected(updatedFiles);
+          // Add a slight delay to ensure React has time to update the state
+          setTimeout(() => {
+            onFilesSelected(updatedFiles);
+            console.log('Notified parent about updated files with server URL:', responseData.files[0]);
+          }, 100);
           
           return updatedFiles;
         });
       } else {
-        throw new Error('No file URLs returned from server');
+        throw new Error('No file URLs returned from server or upload failed');
       }
     } catch (error) {
       console.error('Error uploading file:', error);
@@ -361,10 +395,10 @@ export default function FileUpload({
                 <CardContent className="p-3">
                   <div className="flex items-start space-x-3">
                     {/* Preview or icon */}
-                    {file.preview && ALLOWED_IMAGE_TYPES.includes(file.file.type) ? (
+                    {(file.serverUrl || file.preview) && ALLOWED_IMAGE_TYPES.includes(file.file.type) ? (
                       <div className="h-14 w-14 flex-shrink-0 rounded-md overflow-hidden bg-gray-100">
                         <img
-                          src={file.preview}
+                          src={file.serverUrl || file.preview}
                           alt={file.file.name}
                           className="h-full w-full object-cover"
                         />

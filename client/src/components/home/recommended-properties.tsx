@@ -139,14 +139,14 @@ export default function RecommendedProperties() {
           </div>
         ) : properties.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {properties.map((property: Property) => (
+            {properties.map((prop: Property) => (
               <PropertyCard
-                key={property.id}
-                property={property}
+                key={prop.id}
+                prop={prop}
                 isAiRecommended={
                   !!user &&
                   recommendations.length > 0 &&
-                  recommendations.some((r) => r.id === property.id)
+                  recommendations.some((r) => r.id === prop.id)
                 }
               />
             ))}

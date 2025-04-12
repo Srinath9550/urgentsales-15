@@ -378,14 +378,46 @@ export default function PropertyDetail() {
   }
 
   // Use property images or a default image
-  const images = property.imageUrls?.length
-    ? property.imageUrls
-    : [
-        "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=870&q=80",
-      ];
+  const defaultImage = "/placeholder-property.jpg";
+  
+  // Validate image URLs to ensure they're valid strings
+  const validateImageUrls = (urls?: string[]) => {
+    if (!urls || !Array.isArray(urls)) {
+      console.log("Invalid image URLs array:", urls);
+      return [defaultImage];
+    }
+    
+    // Filter out any invalid URLs (empty strings, undefined, etc.)
+    const validUrls = urls.filter(url => url && typeof url === 'string' && url.trim() !== '');
+    
+    if (validUrls.length === 0) {
+      console.log("No valid image URLs found in:", urls);
+    }
+    
+    // Process URLs to ensure they have the correct format
+    const processedUrls = validUrls.map(url => {
+      // Handle different URL formats
+      if (url.startsWith('http')) {
+        return url;
+      } else if (url.startsWith('/')) {
+        return url;
+      } else if (url.startsWith('uploads/')) {
+        return '/' + url;
+      } else {
+        // Add leading slash if missing
+        return '/' + url;
+      }
+    });
+    
+    console.log(`Property ${property.id} processed image URLs:`, processedUrls);
+    return processedUrls.length > 0 ? processedUrls : [defaultImage];
+  };
+  
+  const images = validateImageUrls(property.imageUrls);
+  console.log(`Property ${property.id} has ${images.length} valid images:`, images);
       
   // Videos from property if available
-  const videos = property.videoUrls || [];
+  const videos = property.videoUrls && Array.isArray(property.videoUrls) ? property.videoUrls : [];
 
   const handleImageError = (index: number) => {
     setImageLoadError((prev) => ({
@@ -458,17 +490,25 @@ export default function PropertyDetail() {
                     {images.map((image, index) => (
                       <CarouselItem key={index} className="h-full">
                         <div className="relative w-full h-full">
+                          {/* Skeleton loader while image is loading */}
+                          <div className="absolute inset-0 bg-gray-200 animate-pulse"></div>
+                          
                           <img
                             src={image}
                             alt={`${property.title} - ${index + 1}`}
-                            className="w-full h-full object-contain md:object-cover transition-transform duration-500 group-hover:scale-105"
+                            className="w-full h-full object-contain md:object-cover transition-transform duration-500 group-hover:scale-105 relative z-10"
+                            style={{ opacity: imageLoadError[index] ? 0 : 1 }}
+                            onLoad={() => {
+                              console.log(`Image loaded successfully at index ${index}:`, image);
+                            }}
                             onError={(e) => {
+                              console.log(`Error loading image at index ${index}:`, image);
                               handleImageError(index);
                               e.currentTarget.onerror = null;
-                              e.currentTarget.src =
-                                "https://images.unsplash.com/photo-1582407947304-fd86f028f716?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80";
+                              e.currentTarget.src = defaultImage;
                             }}
                           />
+                          
                           {index === activeImageIndex && (
                             <div className="absolute inset-0 bg-black bg-opacity-20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
                           )}
@@ -528,17 +568,26 @@ export default function PropertyDetail() {
                       }
                     }}
                   >
-                    <img
-                      src={image}
-                      alt={`${property.title} - ${index + 1}`}
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        handleImageError(index);
-                        e.currentTarget.onerror = null;
-                        e.currentTarget.src =
-                          "https://images.unsplash.com/photo-1582407947304-fd86f028f716?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80";
-                      }}
-                    />
+                    <div className="relative w-full h-full">
+                      {/* Skeleton loader while thumbnail is loading */}
+                      <div className="absolute inset-0 bg-gray-200 animate-pulse"></div>
+                      
+                      <img
+                        src={image}
+                        alt={`${property.title} - ${index + 1}`}
+                        className="w-full h-full object-cover relative z-10"
+                        style={{ opacity: imageLoadError[index] ? 0 : 1 }}
+                        onLoad={() => {
+                          console.log(`Thumbnail loaded successfully at index ${index}:`, image);
+                        }}
+                        onError={(e) => {
+                          console.log(`Error loading thumbnail at index ${index}:`, image);
+                          handleImageError(index);
+                          e.currentTarget.onerror = null;
+                          e.currentTarget.src = defaultImage;
+                        }}
+                      />
+                    </div>
                   </div>
                 ))}
               </div>
@@ -565,17 +614,25 @@ export default function PropertyDetail() {
                         key={index}
                         className="h-full flex items-center justify-center p-4"
                       >
-                        <img
-                          src={image}
-                          alt={`${property.title} - ${index + 1}`}
-                          className="max-w-full max-h-full object-contain"
-                          onError={(e) => {
-                            handleImageError(index);
-                            e.currentTarget.onerror = null;
-                            e.currentTarget.src =
-                              "https://images.unsplash.com/photo-1582407947304-fd86f028f716?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80";
-                          }}
-                        />
+                        <div className="relative w-full h-full flex items-center justify-center">
+                          {/* Skeleton loader while image is loading */}
+                          <div className="absolute inset-0 bg-gray-200 animate-pulse"></div>
+                          
+                          <img
+                            src={image}
+                            alt={`${property.title} - ${index + 1}`}
+                            className="max-w-full max-h-full object-contain relative z-10"
+                            style={{ opacity: imageLoadError[index] ? 0 : 1 }}
+                            onLoad={() => {
+                              console.log(`Fullscreen image loaded successfully at index ${index}:`, image);
+                            }}
+                            onError={(e) => {
+                              handleImageError(index);
+                              e.currentTarget.onerror = null;
+                              e.currentTarget.src = defaultImage;
+                            }}
+                          />
+                        </div>
                       </CarouselItem>
                     ))}
                   </CarouselContent>
@@ -790,8 +847,8 @@ export default function PropertyDetail() {
                       </div>
                     </div>
                     <div className="flex flex-col space-y-2">
-                      {/* If property is approved or user has been granted access, show contact info */}
-                      {(property.approvalStatus === "approved" || accessGranted) ? (
+                      {/* Only show direct contact info if user has been granted access through the interest form */}
+                      {accessGranted ? (
                         <>
                           {/* Direct contact buttons for approved properties */}
                           <div className="mb-3 p-3 bg-green-50 border border-green-100 rounded-md">
@@ -799,29 +856,40 @@ export default function PropertyDetail() {
                               <Sparkles className="h-4 w-4 mr-2" />
                               <span className="text-sm font-medium">Verified Listing</span>
                             </div>
-                            <p className="text-sm text-gray-600 mb-2">Contact information is available for this approved property:</p>
+                            <p className="text-sm text-gray-600 mb-2">Contact information is now available:</p>
                             <div className="grid grid-cols-1 gap-2">
                               <div className="flex items-center">
                                 <Phone className="h-4 w-4 mr-2 text-gray-500" />
-                                <a href="tel:+919876543210" className="text-primary hover:underline">+91 9876543210</a>
+                                <a href={`tel:${property.contactPhone || '+919876543210'}`} className="text-primary hover:underline">
+                                  {property.contactPhone || '+91 9876543210'}
+                                </a>
                               </div>
                               <div className="flex items-center">
                                 <Mail className="h-4 w-4 mr-2 text-gray-500" />
-                                <a href="mailto:seller@example.com" className="text-primary hover:underline">seller@example.com</a>
+                                <a href={`mailto:${property.contactEmail || 'seller@example.com'}`} className="text-primary hover:underline">
+                                  {property.contactEmail || 'seller@example.com'}
+                                </a>
                               </div>
                             </div>
                           </div>
                           {/* Direct contact buttons */}
-                          <Button className="w-full bg-primary hover:bg-primary/90" onClick={() => window.location.href = "tel:+919876543210"}>
+                          <Button 
+                            className="w-full bg-primary hover:bg-primary/90" 
+                            onClick={() => window.location.href = `tel:${property.contactPhone || '+919876543210'}`}
+                          >
                             <Phone className="h-4 w-4 mr-2" /> Call Owner
                           </Button>
-                          <Button variant="outline" className="w-full" onClick={() => window.location.href = "mailto:seller@example.com"}>
+                          <Button 
+                            variant="outline" 
+                            className="w-full" 
+                            onClick={() => window.location.href = `mailto:${property.contactEmail || 'seller@example.com'}`}
+                          >
                             <Mail className="h-4 w-4 mr-2" /> Email Owner
                           </Button>
                         </>
                       ) : (
                         <>
-                          {/* For non-approved properties, show interest form buttons */}
+                          {/* For all properties, show interest form buttons by default */}
                           <div className="mb-3 p-3 bg-yellow-50 border border-yellow-100 rounded-md">
                             <p className="text-sm text-gray-600">
                               This property's contact information is private. Submit your details to request access.

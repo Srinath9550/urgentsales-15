@@ -1,5 +1,5 @@
 import express, { type Express } from "express";
-import fs from "fs";
+import fs from "fs-extra";
 import path, { dirname } from "path";
 import { fileURLToPath } from "url";
 import { createServer as createViteServer, createLogger } from "vite";
@@ -73,7 +73,7 @@ export async function setupVite(app: Express, server: Server) {
 export function serveStatic(app: Express) {
   const distPath = path.resolve(__dirname, "public");
 
-  if (!fs.existsSync(distPath)) {
+  if (!fs.pathExistsSync(distPath)) {
     throw new Error(
       `Could not find the build directory: ${distPath}, make sure to build the client first`,
     );
