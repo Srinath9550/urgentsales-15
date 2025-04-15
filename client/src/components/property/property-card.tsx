@@ -4,8 +4,8 @@ import { Badge } from "@/components/ui/badge";
 import { IndianRupee, Bed, Bath, Building2 } from "lucide-react";
 import { Link } from "wouter";
 import { useState, useEffect } from "react";
-  // Import the image utility functions
-  import { formatImageUrl, handleImageError } from "@/lib/image-utils";
+// Import the image utility functions
+import { formatImageUrl, formatImageUrlAsync, handleImageError } from "@/lib/image-utils";
 
 interface PropertyCardProps {
   prop: Property;
@@ -17,23 +17,36 @@ export function PropertyCard({ prop, isAiRecommended }: PropertyCardProps) {
   const [imageUrl, setImageUrl] = useState<string>('');
   
   useEffect(() => {
-    async function fetchSignedUrl() {
-      if (prop.imageUrls?.[0]) {
-        try {
-          const response = await fetch(`/api/images/signed-url?key=${prop.imageUrls[0]}`);
-          const { url } = await response.json();
-          setImageUrl(url);
-        } catch (error) {
-          console.error('Error fetching signed URL:', error);
-          setImageError(true);
+    if (prop.imageUrls?.[0]) {
+      // Use the direct API endpoint for S3 images
+      try {
+        const imageKey = prop.imageUrls[0];
+        
+        // If it's already a full URL, use it as is
+        if (imageKey.startsWith('http://') || imageKey.startsWith('https://')) {
+          setImageUrl(imageKey);
+          return;
         }
+        
+        // If it already contains our API endpoint, use it directly
+        if (imageKey.includes('/api/s3-image?key=')) {
+          setImageUrl(imageKey);
+          return;
+        }
+        
+        // Otherwise, create a new API URL with the encoded key
+        const apiUrl = `/api/s3-image?key=${encodeURIComponent(imageKey)}`;
+        console.log(`Property ${prop.id} using image URL: ${apiUrl}`);
+        setImageUrl(apiUrl);
+      } catch (error) {
+        console.error('Error formatting image URL:', error);
+        setImageError(true);
       }
     }
-    fetchSignedUrl();
-  }, [prop.imageUrls]);
+  }, [prop.imageUrls, prop.id]);
   
-  // Default placeholder image
-  const placeholderImage = "/placeholder-property.jpg";
+  // Default placeholder image - use inline SVG for reliability
+  const placeholderImage = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2VlZWVlZSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMjAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiIGZpbGw9IiM5OTk5OTkiPlByb3BlcnR5IEltYWdlPC90ZXh0Pjwvc3ZnPg==";
   
 
   

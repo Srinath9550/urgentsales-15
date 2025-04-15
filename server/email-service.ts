@@ -236,21 +236,32 @@ const emailTemplates = {
 };
 
 // Generic function to send an email
-export async function sendEmail(to: string, subject: string, html: string) {
+export async function sendEmail({ to, subject, html, cc }: { to: string, subject: string, html: string, cc?: string }) {
   try {
+    // Check if recipient is provided
+    if (!to || to.trim() === '') {
+      console.warn("Email not sent: No recipient specified");
+      return { success: false, error: "No recipient specified" };
+    }
+
     const mailOptions = {
       from: '"Real Estate Platform" <urgentsales.in@gmail.com>',
       to,
+      cc,
       subject,
       html,
     };
+
+    // Log email attempt
+    console.log(`Attempting to send email to: ${to}, subject: ${subject}`);
 
     const info = await transporter.sendMail(mailOptions);
     console.log("Email sent: %s", info.messageId);
     return { success: true, messageId: info.messageId };
   } catch (error) {
     console.error("Error sending email:", error);
-    throw error;
+    // Return error instead of throwing to prevent application crashes
+    return { success: false, error: error.message || "Unknown error sending email" };
   }
 }
 
@@ -412,11 +423,12 @@ export async function handlePropertyInterest(req: Request, res: Response) {
       propertyLocation,
       approvalStatus,
     });
-    await sendEmail(
-      "urgentsales.in@gmail.com",
-      template.subject,
-      template.html,
-    );
+    await sendEmail({
+      to: "urgentsales.in@gmail.com",
+      subject: template.subject,
+      html: template.html,
+      cc: email // Also send a copy to the person who expressed interest
+    });
 
     res.json({
       success: true,

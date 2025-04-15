@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { formatImageUrl, handleImageError } from "@/lib/image-utils";
 
 // Define sample property data for demonstration
 const dummyProperties = [
@@ -174,9 +175,7 @@ export default function NewlyListedProperties() {
                     <div className="absolute inset-0 bg-gray-200 animate-pulse"></div>
                     
                     <img
-                      src={property.image && property.image.startsWith('http') ? property.image : 
-                           property.image && property.image.startsWith('/') ? property.image : 
-                           property.image ? `/${property.image}` : '/placeholder-property.jpg'}
+                      src={property.image ? formatImageUrl(property.image) : '/placeholder-property.jpg'}
                       alt={property.title}
                       onClick={() => window.scrollTo(0, 0)}
                       className="w-full h-full object-cover relative z-10"
@@ -185,7 +184,7 @@ export default function NewlyListedProperties() {
                       }}
                       onError={(e) => {
                         console.log(`Error loading image: ${property.image}`);
-                        e.currentTarget.src = '/placeholder-property.jpg';
+                        handleImageError(e);
                       }}
                     />
                   </div>

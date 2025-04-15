@@ -176,7 +176,7 @@ export const propertyRecommendations = pgTable("property_recommendations", {
   score: doublePrecision("score").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 
-  contactName: text("contact_name"), // Optional contact name
+  // contactName: text("contact_name"), // Optional contact name
   contactEmail: text("contact_email"), // Optional contact email
   contactPhone: text("contact_phone"),
 });

@@ -611,14 +611,31 @@ export default function AdminDashboard() {
                             {property.imageUrls &&
                               property.imageUrls.length > 0 && (
                                 <div className="flex space-x-2 mb-4 overflow-x-auto">
-                                  {property.imageUrls.map((url, index) => (
-                                    <img
-                                      key={index}
-                                      src={url}
-                                      alt={`Property ${index + 1}`}
-                                      className="h-20 w-20 object-cover rounded"
-                                    />
-                                  ))}
+                                  {property.imageUrls.map((url, index) => {
+                                    // Format the image URL properly
+                                    const imageUrl = url.startsWith('http') 
+                                      ? url 
+                                      : url.startsWith('/') 
+                                        ? url // Local URL starting with /
+                                        : `https://${process.env.NEXT_PUBLIC_AWS_BUCKET_NAME || 'property-images-urgent-sales'}.s3.${process.env.NEXT_PUBLIC_AWS_REGION || 'ap-south-1'}.amazonaws.com/${url}`;
+                                    
+                                    return (
+                                      <div key={index} className="relative h-20 w-20 rounded overflow-hidden">
+                                        <img
+                                          src={imageUrl}
+                                          alt={`Property ${index + 1}`}
+                                          className="h-full w-full object-cover rounded"
+                                          onError={(e) => {
+                                            // Fallback to placeholder on error
+                                            e.currentTarget.src = '/images/property-placeholder.jpg';
+                                          }}
+                                        />
+                                        <div className="absolute bottom-0 right-0 bg-black bg-opacity-50 text-white text-xs px-1">
+                                          {index + 1}
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
                                 </div>
                               )}
                           </div>
@@ -756,14 +773,31 @@ export default function AdminDashboard() {
 
                             {project.imageUrls && project.imageUrls.length > 0 && (
                               <div className="flex space-x-2 mb-4 overflow-x-auto">
-                                {project.imageUrls.map((url, index) => (
-                                  <img
-                                    key={index}
-                                    src={url}
-                                    alt={`Project ${index + 1}`}
-                                    className="h-20 w-20 object-cover rounded"
-                                  />
-                                ))}
+                                {project.imageUrls.map((url, index) => {
+                                  // Format the image URL properly
+                                  const imageUrl = url.startsWith('http') 
+                                    ? url 
+                                    : url.startsWith('/') 
+                                      ? url // Local URL starting with /
+                                      : `https://${process.env.NEXT_PUBLIC_AWS_BUCKET_NAME || 'property-images-urgent-sales'}.s3.${process.env.NEXT_PUBLIC_AWS_REGION || 'ap-south-1'}.amazonaws.com/${url}`;
+                                  
+                                  return (
+                                    <div key={index} className="relative h-20 w-20 rounded overflow-hidden">
+                                      <img
+                                        src={imageUrl}
+                                        alt={`Project ${index + 1}`}
+                                        className="h-full w-full object-cover rounded"
+                                        onError={(e) => {
+                                          // Fallback to placeholder on error
+                                          e.currentTarget.src = '/images/property-placeholder.jpg';
+                                        }}
+                                      />
+                                      <div className="absolute bottom-0 right-0 bg-black bg-opacity-50 text-white text-xs px-1">
+                                        {index + 1}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
                               </div>
                             )}
                           </div>

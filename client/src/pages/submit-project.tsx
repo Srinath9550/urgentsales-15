@@ -426,10 +426,24 @@ export default function SubmitProjectPage() {
         formData.append("heroImage", heroImage);
       }
   
-      // Add gallery images
-      if (galleryFiles && galleryFiles.length > 0) {
-        galleryFiles.forEach((file) => {
-          formData.append('gallery', file);
+      // Add gallery URLs as JSON string
+      if (filteredData.galleryUrls && filteredData.galleryUrls.length > 0) {
+        // Clean up any URLs that might have curly braces
+        const cleanedUrls = filteredData.galleryUrls.map(url => {
+          if (typeof url === 'string' && url.startsWith('{') && url.endsWith('}')) {
+            return url.substring(1, url.length - 1);
+          }
+          return url;
+        });
+        
+        console.log('Cleaned gallery URLs:', cleanedUrls);
+        
+        // Add as JSON string
+        formData.append('galleryUrls', JSON.stringify(cleanedUrls));
+        
+        // Also add individual URLs for debugging
+        cleanedUrls.forEach((url, index) => {
+          formData.append(`galleryUrl_${index}`, url);
         });
       }
   
@@ -444,6 +458,19 @@ export default function SubmitProjectPage() {
       formData.append('status', 'upcoming');
       formData.append('approvalStatus', 'pending');
   
+      // Clean up any URLs that might have curly braces
+      const cleanHeroUrl = data.heroImageUrl && typeof data.heroImageUrl === 'string' && 
+        data.heroImageUrl.startsWith('{') && data.heroImageUrl.endsWith('}') 
+        ? data.heroImageUrl.substring(1, data.heroImageUrl.length - 1) 
+        : data.heroImageUrl;
+        
+      const cleanGalleryUrls = (data.galleryUrls || []).map(url => {
+        if (typeof url === 'string' && url.startsWith('{') && url.endsWith('}')) {
+          return url.substring(1, url.length - 1);
+        }
+        return url;
+      });
+      
       // Create backup JSON data
       const jsonData = {
         title: data.projectName,
@@ -458,7 +485,7 @@ export default function SubmitProjectPage() {
         status: "upcoming",
         amenities: data.amenities || [],
         tags: [data.projectCategory],
-        imageUrls: [data.heroImageUrl, ...(data.galleryUrls || [])].filter(url => url && url.trim() !== ""),
+        imageUrls: [cleanHeroUrl, ...cleanGalleryUrls].filter(url => url && url.trim() !== ""),
         contactNumber: user?.phone || "",
         userId: user?.id || 1,
         approvalStatus: "pending"

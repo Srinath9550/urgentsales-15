@@ -35,11 +35,12 @@ import {
   handlePropertyInterest,
 } from "./email-service";
 import propertyInterestRoutes from "./routes/property-interest";
+import s3ImageRoutes from "./routes/s3-image-routes";
 import {
   getRecentLogs,
   getEntityLogs,
 } from "./logger-service";
-import { upload, getFileUrl, deleteFile } from "./file-upload";
+import { upload, getFileUrl, deleteFile, processS3Upload } from "./file-upload";
 import {
   getUpcomingProjects,
   getFeaturedProjects,
@@ -332,6 +333,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Register property interest routes
   app.use('/api/property-interest', propertyInterestRoutes);
+  
+  // Register S3 image routes
+  app.use('/api', s3ImageRoutes);
 
   // Serve logo from root path
   // app.get('/logo.png', (req, res) => {
@@ -369,7 +373,81 @@ export async function registerRoutes(app: Express): Promise<Server> {
   );
 
   // =========== Upload Routes ===========
+
+  // Check S3 configuration
+  app.get("/api/s3-config", (req, res) => {
+    try {
+      const s3Config = {
+        isConfigured: !!(process.env.AWS_BUCKET_NAME && process.env.AWS_ACCESS_KEY && process.env.AWS_SECRET_KEY),
+        bucketName: process.env.AWS_BUCKET_NAME,
+        region: process.env.AWS_BUCKET_REGION || 'ap-south-1'
+      };
+      
+      console.log("S3 configuration:", s3Config);
+      
+      res.json({
+        success: true,
+        data: s3Config
+      });
+    } catch (error) {
+      console.error("Error checking S3 config:", error);
+      res.status(500).json({
+        success: false,
+        message: "Error checking S3 configuration"
+      });
+    }
+  });
   
+  // Get a pre-signed URL for S3 objects
+  app.get("/api/s3-signed-url", asyncHandler(async (req, res) => {
+    try {
+      const { key } = req.query;
+      
+      if (!key || typeof key !== 'string') {
+        return res.status(400).json({
+          success: false,
+          message: "Missing or invalid 'key' parameter"
+        });
+      }
+      
+      // Generate pre-signed URL
+      const signedUrl = await getSignedImageUrl(key);
+      
+      // Check if we got a valid signed URL
+      if (!signedUrl) {
+        console.log(`Failed to generate pre-signed URL for key: ${key}`);
+        return res.status(404).json({
+          success: false,
+          message: "Could not generate signed URL for the provided key",
+          data: {
+            originalKey: key,
+            signedUrl: '' // Empty string indicates failure
+          }
+        });
+      }
+      
+      console.log(`Generated pre-signed URL for key: ${key}`);
+      
+      res.json({
+        success: true,
+        data: {
+          originalKey: key,
+          signedUrl: signedUrl
+        }
+      });
+    } catch (error) {
+      console.error("Error generating pre-signed URL:", error);
+      res.status(500).json({
+        success: false,
+        message: "Error generating pre-signed URL",
+        data: {
+          originalKey: req.query.key,
+          signedUrl: '' // Empty string indicates failure
+        }
+      });
+    }
+  }));
+
   // Property image upload endpoint is defined later in the file
 
   // =========== Notification Routes ===========
@@ -1698,6 +1776,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         if (!Array.isArray(propertyDataToInsert.imageUrls)) {
           propertyDataToInsert.imageUrls = [];
+        }
+        
+        // Validate S3 image URLs
+        try {
+          const { validateAndFilterImageKeys } = await import('./s3-utils');
+          console.log("Raw image keys:", propertyDataToInsert.imageUrls);
+          
+          // Only validate S3 keys (not placeholder images)
+          const s3Keys = propertyDataToInsert.imageUrls.filter(url => 
+            url && typeof url === 'string' && url.includes('/') && !url.startsWith('/images/')
+          );
+          
+          if (s3Keys.length > 0) {
+            // Validate and filter S3 keys
+            const validatedKeys = await validateAndFilterImageKeys(s3Keys);
+            console.log("Cleaned valid image keys:", validatedKeys);
+            
+            // Replace the original S3 keys with validated ones
+            propertyDataToInsert.imageUrls = propertyDataToInsert.imageUrls.filter(url => 
+              !s3Keys.includes(url)
+            );
+            propertyDataToInsert.imageUrls.push(...validatedKeys);
+          }
+          
+          // If we lost all images in validation, use placeholder
+          if (propertyDataToInsert.imageUrls.length === 0) {
+            const placeholderImage = '/images/property-placeholder.jpg';
+            propertyDataToInsert.imageUrls.push(placeholderImage);
+            console.log("Added placeholder image after validation found no valid images");
+          }
+        } catch (validationError) {
+          console.error("Error validating S3 image keys:", validationError);
+          // Continue with the unvalidated keys if validation fails
         }
 
         if (!Array.isArray(propertyDataToInsert.videoUrls)) {
@@ -3211,6 +3322,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post(
     "/api/properties/free",
     upload.any(), // Accept files with any field name
+    processS3Upload, // Add S3 upload middleware
     asyncHandler(async (req, res) => {
       try {
         console.log(
@@ -3237,10 +3349,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
               
               if (Array.isArray(parsedUrls)) {
                 console.log(`Found ${parsedUrls.length} pre-uploaded image URLs`);
-                uploadedFiles = parsedUrls;
                 
-                // Add all images to a general category
-                imageCategories['uploaded'] = parsedUrls;
+                // Filter out any empty strings or invalid URLs
+                const validUrls = parsedUrls.filter(url => 
+                  typeof url === 'string' && url.trim() !== ''
+                );
+                
+                if (validUrls.length === 0) {
+                  console.warn("No valid image URLs found in the parsed JSON");
+                } else {
+                  console.log(`Found ${validUrls.length} valid pre-uploaded image URLs`);
+                  uploadedFiles = validUrls;
+                  
+                  // Add all images to a general category
+                  imageCategories['uploaded'] = validUrls;
+                }
               }
             }
           } catch (error) {
@@ -3250,6 +3373,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         // Check for category-specific pre-uploaded URLs from the form
         const categoryPrefixes = ['exterior', 'livingRoom', 'kitchen', 'bedroom', 'bathroom', 'floorPlan', 'locationMap', 'other'];
+        
+        // Track unique image URLs to avoid duplicates
+        const uniqueImageUrls = new Set(uploadedFiles);
         
         categoryPrefixes.forEach(prefix => {
           // Check for URLs in the format prefix_urls_0, prefix_urls_1, etc.
@@ -3261,13 +3387,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const url = req.body[`${prefix}_urls_${index}`];
             console.log(`Found ${prefix} URL at index ${index}:`, url);
             
+            // Handle string URLs
             if (url && typeof url === 'string') {
-              categoryUrls.push(url);
-              
-              // Also add to the main uploadedFiles array if not already there
-              if (!uploadedFiles.includes(url)) {
-                uploadedFiles.push(url);
+              // Only add if it's not already in our set
+              if (!uniqueImageUrls.has(url)) {
+                uniqueImageUrls.add(url);
+                categoryUrls.push(url);
               }
+            }
+            
+            // Handle array of URLs
+            if (Array.isArray(url)) {
+              // Filter out duplicates and only add unique URLs
+              url.forEach(item => {
+                if (item && typeof item === 'string' && !uniqueImageUrls.has(item)) {
+                  uniqueImageUrls.add(item);
+                  categoryUrls.push(item);
+                }
+              });
             }
             
             index++;
@@ -3275,10 +3412,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           // If we found any URLs for this category, add them to the imageCategories
           if (categoryUrls.length > 0) {
-            console.log(`Adding ${categoryUrls.length} URLs to ${prefix} category`);
+            console.log(`Adding ${categoryUrls.length} unique URLs to ${prefix} category`);
             imageCategories[prefix] = categoryUrls;
           }
         });
+        
+        // Update the uploadedFiles array with our unique URLs
+        uploadedFiles = Array.from(uniqueImageUrls);
+        
+        // Validate S3 image keys
+        try {
+          const { validateAndFilterImageKeys } = await import('./s3-utils');
+          console.log("Raw image keys:", uploadedFiles);
+          
+          // Validate and filter S3 keys
+          uploadedFiles = await validateAndFilterImageKeys(uploadedFiles);
+          console.log("Cleaned valid image keys:", uploadedFiles);
+        } catch (validationError) {
+          console.error("Error validating S3 image keys:", validationError);
+          // Continue with the unvalidated keys if validation fails
+        }
         
         // Also process any files that were uploaded directly with this request
         if (req.files && Array.isArray(req.files)) {
@@ -3288,7 +3441,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Create the upload directory if it doesn't exist
           const uploadDir = `./public/uploads/user-${guestId}`;
           try {
-            await fs.promises.mkdir(uploadDir, { recursive: true });
+            await fs.ensureDir(uploadDir);
             console.log(`Created upload directory: ${uploadDir}`);
           } catch (mkdirError) {
             console.error(`Error creating upload directory: ${uploadDir}`, mkdirError);
@@ -3297,11 +3450,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Process each file
           for (const file of req.files) {
             try {
+              // Skip invalid files
+              if (!file || file.size === 0) {
+                console.warn(`Skipping invalid or empty file: ${file?.originalname || 'unknown'}`);
+                continue;
+              }
+              
               const fieldName = file.fieldname || '';
               const category = fieldName.split('_')[0] || 'other';
               
+              // Check if the file has an S3 key from the middleware
+              if (file.s3Key) {
+                console.log(`Using S3 key from middleware: ${file.s3Key}`);
+                
+                // Initialize category array if it doesn't exist
+                if (!imageCategories[category]) {
+                  imageCategories[category] = [];
+                }
+                
+                // Add to appropriate arrays
+                if (file.mimetype.startsWith('video/') || fieldName.startsWith('video_')) {
+                  videoUrls.push(file.s3Key);
+                  imageCategories[category].push(file.s3Key);
+                } else {
+                  uploadedFiles.push(file.s3Key);
+                  imageCategories[category].push(file.s3Key);
+                }
+                
+                continue; // Skip to next file
+              }
+              
               // Create unique filename to prevent collisions
-              const filename = `${file.originalname.replace(/[^a-zA-Z0-9.]/g, '_')}-${Math.random().toString(16).substring(2)}`;
+              const timestamp = Date.now();
+              const randomId = Math.floor(Math.random() * 1000000);
+              const sanitizedFilename = file.originalname.replace(/[^a-zA-Z0-9.]/g, '_');
+              const filename = `${timestamp}-${randomId}-${sanitizedFilename}`;
               const filePath = `${uploadDir}/${filename}`;
               
               // Make sure the URL is properly formatted for web access
@@ -3309,9 +3492,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
               const fileUrl = `/uploads/user-${guestId}/${filename}`;
               console.log(`Generated file URL for free property: ${fileUrl}`);
               
-              // Write the file to disk
-              await fs.promises.writeFile(filePath, file.buffer);
-              console.log(`Saved file to ${filePath}`);
+              // Check if buffer exists before writing
+              if (!file.buffer) {
+                console.error(`Missing buffer for file: ${file.originalname}`);
+                
+                // If we have a path property, try to read the file from disk
+                if (file.path) {
+                  try {
+                    console.log(`Attempting to read file from path: ${file.path}`);
+                    const fileContent = await fs.readFile(file.path);
+                    
+                    // Write the file to disk
+                    await fs.writeFile(filePath, fileContent);
+                    console.log(`Saved file to ${filePath} (${fileContent.length} bytes)`);
+                  } catch (readError) {
+                    console.error(`Failed to read file from path: ${file.path}`, readError);
+                    continue;
+                  }
+                } else {
+                  // Try to use the S3 upload directly
+                  try {
+                    const { uploadToS3 } = await import('./s3-service');
+                    const s3Key = await uploadToS3(file, `properties/user-${guestId}`);
+                    
+                    if (s3Key) {
+                      console.log(`Successfully uploaded file to S3: ${s3Key}`);
+                      
+                      // Use the S3 key directly instead of local file
+                      const s3FileUrl = s3Key;
+                      
+                      // Initialize category array if it doesn't exist
+                      if (!imageCategories[category]) {
+                        imageCategories[category] = [];
+                      }
+                      
+                      // Add to appropriate arrays
+                      if (file.mimetype.startsWith('video/') || fieldName.startsWith('video_')) {
+                        videoUrls.push(s3FileUrl);
+                        imageCategories[category].push(s3FileUrl);
+                      } else {
+                        uploadedFiles.push(s3FileUrl);
+                        imageCategories[category].push(s3FileUrl);
+                      }
+                      
+                      // Skip the rest of the processing for this file
+                      continue;
+                    }
+                  } catch (s3Error) {
+                    console.error(`Failed to upload file to S3:`, s3Error);
+                  }
+                  
+                  // If we get here, both local and S3 uploads failed
+                  continue;
+                }
+              } else {
+                // Write the file to disk using the buffer
+                await fs.writeFile(filePath, file.buffer);
+                console.log(`Saved file to ${filePath} (${file.size} bytes)`);
+              }
               
               // Initialize category array if it doesn't exist
               if (!imageCategories[category]) {
@@ -3341,13 +3579,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.warn("No images found for property submission!");
         }
         
-        // Ensure we have at least one image (even if it's a placeholder)
+        // Check if we have at least one valid image URL
         if (uploadedFiles.length === 0) {
+          console.log("No valid image URLs found for property submission");
+          
+          // If this is a production environment, require images
+          if (process.env.NODE_ENV === 'production' && !req.body.allowNoImages) {
+            return res.status(400).json({
+              success: false,
+              message: "At least one property image is required. Please upload images before submitting."
+            });
+          }
+          
+          // Use a placeholder image
           const placeholderImage = '/images/property-placeholder.jpg';
           uploadedFiles.push(placeholderImage);
           imageCategories['placeholder'] = [placeholderImage];
-          console.log("Added placeholder image since no images were provided");
+          console.log("Added placeholder image since no valid images were provided");
         }
+        
+        // Double-check that all S3 keys are valid and exist
+        try {
+          const { validateAndFilterImageKeys } = await import('./s3-utils');
+          
+          // Only validate S3 keys (not placeholder images)
+          const s3Keys = uploadedFiles.filter(url => 
+            url.includes('/') && !url.startsWith('/images/')
+          );
+          
+          if (s3Keys.length > 0) {
+            console.log(`Performing final validation on ${s3Keys.length} S3 image keys`);
+            const validatedKeys = await validateAndFilterImageKeys(s3Keys);
+            
+            // Replace the original S3 keys with validated ones
+            uploadedFiles = uploadedFiles.filter(url => !s3Keys.includes(url));
+            uploadedFiles.push(...validatedKeys);
+            
+            console.log(`Final validation complete: ${validatedKeys.length} of ${s3Keys.length} S3 keys are valid`);
+            
+            // If we lost all images in validation, use placeholder
+            if (uploadedFiles.length === 0) {
+              const placeholderImage = '/images/property-placeholder.jpg';
+              uploadedFiles.push(placeholderImage);
+              imageCategories['placeholder'] = [placeholderImage];
+              console.log("Added placeholder image after validation found no valid images");
+            }
+          }
+        } catch (validationError) {
+          console.error("Error in final S3 key validation:", validationError);
+          // Continue with the current keys if validation fails
+        }
+        
+        // Log the final list of image URLs
+        console.log(`Total images to save: ${uploadedFiles.length}, videos: ${videoUrls.length}`);
+        console.log("Final image URLs:", uploadedFiles);
 
         // Insert directly into free_properties table using raw SQL
         const query = `
@@ -3499,10 +3784,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const propertyPrice = parseInt(req.body.price) ? `₹${parseInt(req.body.price).toLocaleString()}` : 'Price not specified';
           
           // Send email to admin
-          await sendEmail(
-            "urgentsale.in@gmail.com", 
-            "New Free Property Submission Requires Verification", 
-            `
+          const adminEmail = process.env.ADMIN_EMAIL || "urgentsale.in@gmail.com";
+          console.log(`Sending admin notification to: ${adminEmail}`);
+          
+          const emailResult = await sendEmail({
+            to: adminEmail, 
+            subject: "New Free Property Submission Requires Verification", 
+            html: `
             <h1>New Free Property Submission</h1>
             <p>A new property has been submitted through the free property form and requires your verification:</p>
             <ul>
@@ -3515,10 +3803,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
             </ul>
             <p>Please log in to the admin panel to review and approve this property.</p>
             `
-          );
-          console.log("Admin notification email sent successfully for free property");
+          });
+          
+          if (emailResult.success) {
+            console.log("Admin notification email sent successfully for free property");
+          } else {
+            console.warn(`Admin notification email failed: ${emailResult.error}`);
+          }
+          
+          // Send notification to the user if they provided an email
+          if (req.body.contactEmail && req.body.contactEmail.includes('@')) {
+            console.log(`Sending confirmation email to: ${req.body.contactEmail}`);
+            
+            const userEmailResult = await sendEmail({
+              to: req.body.contactEmail,
+              subject: "Your Property Listing Has Been Submitted",
+              html: `
+              <h1>Thank You for Your Property Submission</h1>
+              <p>Your property listing "${req.body.title || 'Untitled Property'}" has been submitted successfully and is pending verification by our team.</p>
+              <p>We will review your listing and publish it as soon as possible. You will receive another email once your property is approved.</p>
+              <p>Property details:</p>
+              <ul>
+                <li><strong>Title:</strong> ${req.body.title || 'Untitled Property'}</li>
+                <li><strong>Location:</strong> ${req.body.location || 'Unknown location'}${req.body.city ? ', ' + req.body.city : ''}</li>
+                <li><strong>Type:</strong> ${req.body.propertyType || 'Not specified'}</li>
+                <li><strong>Price:</strong> ${propertyPrice}</li>
+              </ul>
+              <p>If you need to make any changes to your listing, please contact our support team.</p>
+              <p>Thank you for choosing our platform!</p>
+              `
+            });
+            
+            if (!userEmailResult.success) {
+              console.warn(`User notification email failed: ${userEmailResult.error}`);
+            }
+          }
         } catch (emailError) {
-          console.error("Error sending notification email:", emailError);
+          console.error("Error in email notification process:", emailError);
           // Continue with response - don't fail the submission if email fails
         }
 
@@ -4474,6 +4795,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           return res.status(403).json({ message: subscriptionCheck.reason });
         }
         
+        // Process imageUrls if it's a string (JSON)
+        let imageUrls = [];
+        if (typeof req.body.imageUrls === 'string') {
+          try {
+            imageUrls = JSON.parse(req.body.imageUrls);
+            console.log('Successfully parsed imageUrls:', imageUrls);
+          } catch (e) {
+            console.error('Error parsing imageUrls:', e);
+          }
+        } else if (Array.isArray(req.body.imageUrls)) {
+          imageUrls = req.body.imageUrls;
+        }
+        
         // Existing property creation logic
         const property = await storage.createProperty({
           ...req.body,
@@ -4481,6 +4815,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           // Add subscription-related fields if user has a subscription
           premium: subscriptionCheck.subscription ? true : false,
           verified: subscriptionCheck.subscription?.verified_tag ? true : false,
+          // Ensure imageUrls is properly set as an array
+          imageUrls: imageUrls,
           // Add other subscription-related fields as needed
         });
         
@@ -4572,10 +4908,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Import the upload handler
   const { handlePropertyImageUpload } = await import('./upload-routes');
   
-  // Property image upload route
+  // Property image upload route - no authentication required for property images
   app.post(
     "/api/upload/property-images",
     upload.array('files'),
+    processS3Upload, // Add S3 upload middleware
     asyncHandler(handlePropertyImageUpload)
   );
   

@@ -132,6 +132,11 @@ async function startServer(app: any, port: number, isProduction: boolean = false
         const s = app.listen(currentPort, "0.0.0.0", () => {
           log(`Server running at http://0.0.0.0:${currentPort}`);
           serverStarted = true;
+          
+          // Update the port environment variable if it changed
+          process.env.VITE_WS_PORT = String(currentPort);
+          process.env.PORT = String(currentPort);
+          
           resolve(s);
         });
         
@@ -178,8 +183,21 @@ async function startServer(app: any, port: number, isProduction: boolean = false
     fs.ensureDirSync(uploadsDir);
     console.log('Ensured uploads directory exists:', uploadsDir);
 
-    // Serve static files from uploads directory
-    app.use("/uploads", express.static(uploadsDir));
+    // Serve static files from uploads directory with proper CORS and caching headers
+    app.use("/uploads", (req, res, next) => {
+      // Add CORS headers
+      res.header('Access-Control-Allow-Origin', '*');
+      res.header('Access-Control-Allow-Methods', 'GET');
+      res.header('Access-Control-Allow-Headers', 'Content-Type');
+      
+      // Add caching headers
+      res.header('Cache-Control', 'public, max-age=86400'); // 24 hours
+      next();
+    }, express.static(uploadsDir, {
+      maxAge: '1d', // Cache for 1 day
+      etag: true,
+      lastModified: true
+    }));
 
     // Register API routes
     await registerRoutes(app);
@@ -199,6 +217,10 @@ async function startServer(app: any, port: number, isProduction: boolean = false
 if (!isProduction) {
   // ✅ Development: Use Vite dev server
   const server = await startServer(app, port as number);
+  
+  // Set the WS_PORT environment variable for WebSocket connections
+  process.env.VITE_WS_PORT = String(port);
+  
   await setupVite(app, server);
 } else {
   // ✅ Production: Serve built React files
@@ -219,9 +241,6 @@ if (!isProduction) {
     process.exit(1);
   }
 })();
-app.listen(port, () => {
-  console.log(`Server running at http://localhost:${port}`);
-});
 
 // Add this test endpoint after your auth routes
 app.get('/test-email', async (req, res) => {

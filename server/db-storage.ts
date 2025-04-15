@@ -511,11 +511,17 @@ export class DbStorage implements IStorage {
 
   // Recommendation operations
   async addPropertyView(userId: number, propertyId: number): Promise<void> {
-    await db.insert(propertyViews)
-      .values({ userId, propertyId, viewedAt: new Date() });
-    
-    // Update recommendation score
-    await this._updateRecommendationScore(userId, propertyId, 1);
+    try {
+      // Insert the property view
+      await db.insert(propertyViews)
+        .values({ userId, propertyId, viewedAt: new Date() });
+      
+      // Update recommendation score
+      await this._updateRecommendationScore(userId, propertyId, 1);
+    } catch (error) {
+      console.error("Error adding property view:", error);
+      // Continue even if there's an error
+    }
   }
   
   async getUserPropertyViews(userId: number): Promise<{ userId: number, propertyId: number, viewedAt: Date }[]> {
@@ -631,59 +637,94 @@ export class DbStorage implements IStorage {
   }
 
   async _updateRecommendationScore(userId: number, propertyId: number, scoreChange: number): Promise<void> {
-    // Check if recommendation exists
-    const existingRec = await db.select().from(propertyRecommendations)
-      .where(
-        and(
-          eq(propertyRecommendations.userId, userId),
-          eq(propertyRecommendations.propertyId, propertyId)
+    try {
+      // Check if recommendation exists
+      const existingRec = await db.select().from(propertyRecommendations)
+        .where(
+          and(
+            eq(propertyRecommendations.userId, userId),
+            eq(propertyRecommendations.propertyId, propertyId)
+          )
         )
-      )
-      .limit(1);
-    
-    if (existingRec.length > 0) {
-      // Update existing recommendation
-      await db.update(propertyRecommendations)
-        .set({ 
-          score: existingRec[0].score + scoreChange,
-        })
-        .where(eq(propertyRecommendations.id, existingRec[0].id));
-    } else {
-      // Create new recommendation
-      await db.insert(propertyRecommendations)
-        .values({
-          userId,
-          propertyId,
-          score: scoreChange,
-        });
+        .limit(1);
+      
+      if (existingRec.length > 0) {
+        // Update existing recommendation
+        await db.update(propertyRecommendations)
+          .set({ 
+            score: existingRec[0].score + scoreChange,
+          })
+          .where(eq(propertyRecommendations.id, existingRec[0].id));
+      } else {
+        // Create new recommendation
+        await db.insert(propertyRecommendations)
+          .values({
+            userId,
+            propertyId,
+            score: scoreChange,
+          });
+      }
+      
+      // Update similar properties recommendations
+      try {
+        await this._updateSimilarPropertiesRecommendations(userId, propertyId, scoreChange / 2);
+      } catch (error) {
+        console.error("Error updating similar properties recommendations:", error);
+        // Continue even if this fails
+      }
+    } catch (error) {
+      console.error("Error updating recommendation score:", error);
+      // Don't rethrow the error - allow the application to continue
     }
-    
-    // Update similar properties recommendations
-    await this._updateSimilarPropertiesRecommendations(userId, propertyId, scoreChange / 2);
   }
 
   async _updateSimilarPropertiesRecommendations(userId: number, propertyId: number, baseScoreChange: number): Promise<void> {
-    // Get property type, city, and price range
-    const property = await this.getProperty(propertyId);
-    if (!property) return;
-    
-    // Find similar properties (same type, city, similar price range)
-    const similarProperties = await db.select({ id: properties.id })
-      .from(properties)
-      .where(
-        and(
-          not(eq(properties.id, propertyId)), // Exclude the original property
-          eq(properties.propertyType, property.propertyType),
-          eq(properties.city, property.city),
-          gte(properties.price, property.price * 0.8), // 20% price range
-          lte(properties.price, property.price * 1.2)
-        )
-      )
-      .limit(5);
-    
-    // Update recommendation scores for similar properties
-    for (const simProp of similarProperties) {
-      await this._updateRecommendationScore(userId, simProp.id, baseScoreChange);
+    try {
+      // Get property type, city, and price range
+      const property = await this.getProperty(propertyId);
+      if (!property) return;
+      
+      // Build conditions for similar properties
+      const conditions = [
+        not(eq(properties.id, propertyId)), // Exclude the original property
+        eq(properties.propertyType, property.propertyType),
+        gte(properties.price, property.price * 0.8), // 20% price range
+        lte(properties.price, property.price * 1.2)
+      ];
+      
+      // Only add city condition if it exists
+      if (property.city) {
+        conditions.push(eq(properties.city, property.city));
+      }
+      
+      // Find similar properties
+      const similarProperties = await db.select({ id: properties.id })
+        .from(properties)
+        .where(and(...conditions))
+        .limit(5);
+      
+      // Update recommendation scores for similar properties
+      for (const simProp of similarProperties) {
+        try {
+          // Use a direct insert with on conflict update to avoid errors
+          await db.insert(propertyRecommendations)
+            .values({
+              userId,
+              propertyId: simProp.id,
+              score: baseScoreChange
+            })
+            .onConflictDoUpdate({
+              target: [propertyRecommendations.userId, propertyRecommendations.propertyId],
+              set: { score: sql`${propertyRecommendations.score} + ${baseScoreChange}` }
+            });
+        } catch (error) {
+          console.error(`Error updating recommendation for similar property ${simProp.id}:`, error);
+          // Continue with the next property
+        }
+      }
+    } catch (error) {
+      console.error("Error in _updateSimilarPropertiesRecommendations:", error);
+      // Don't rethrow the error
     }
   }
 

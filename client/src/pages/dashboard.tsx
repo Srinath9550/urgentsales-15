@@ -63,6 +63,16 @@ export default function Dashboard() {
     refetch,
   } = useQuery<Property[]>({
     queryKey: ["/api/user/properties"],
+    onSuccess: (data) => {
+      console.log("Properties data:", data);
+      if (data && data.length > 0) {
+        console.log("First property:", data[0]);
+        console.log("Image URLs:", data[0].imageUrls);
+      }
+    },
+    onError: (error) => {
+      console.error("Error fetching properties:", error);
+    }
   });
 
   // Fetch saved properties
@@ -83,6 +93,50 @@ export default function Dashboard() {
       return `₹${(price / 100000).toFixed(0)} Lac`;
     } else {
       return `₹${price.toLocaleString()}`;
+    }
+  };
+  
+  // Format image URL to handle S3 keys
+  const formatImageUrl = (url: string) => {
+    if (!url) {
+      return '/images/property-placeholder.jpg';
+    }
+    
+    // If it's already a full URL, return it as is
+    if (url.startsWith('http')) {
+      return url;
+    }
+    
+    // If it's a local URL starting with /, return it as is
+    if (url.startsWith('/')) {
+      return url;
+    }
+    
+    // Otherwise, assume it's an S3 key and construct the full URL
+    try {
+      // Check if it's a JSON string and parse it
+      if (typeof url === 'string' && (url.startsWith('[') || url.startsWith('{'))) {
+        try {
+          const parsed = JSON.parse(url);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            // If it's an array, use the first item
+            const firstUrl = parsed[0];
+            
+            // Process the URL from the array
+            if (firstUrl.startsWith('http')) return firstUrl;
+            if (firstUrl.startsWith('/')) return firstUrl;
+            
+            return `https://property-images-urgent-sales.s3.ap-south-1.amazonaws.com/${firstUrl}`;
+          }
+        } catch (e) {
+          // Not valid JSON, continue with normal processing
+        }
+      }
+      
+      // Regular S3 URL construction
+      return `https://property-images-urgent-sales.s3.ap-south-1.amazonaws.com/${url}`;
+    } catch (error) {
+      return '/images/property-placeholder.jpg';
     }
   };
 
@@ -186,9 +240,14 @@ export default function Dashboard() {
                       <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-primary/10 flex items-center justify-center overflow-hidden">
                         {profileImage ? (
                           <img
-                            src={profileImage}
+                            key="profile-image-sidebar"
+                            src={formatImageUrl(profileImage)}
                             alt={user.name}
                             className="w-full h-full object-cover"
+                            loading="eager"
+                            onError={(e) => {
+                              e.currentTarget.src = '/images/avatar-placeholder.png';
+                            }}
                           />
                         ) : (
                           <User className="h-5 sm:h-6 w-5 sm:w-6 text-primary" />
@@ -425,12 +484,24 @@ export default function Dashboard() {
                               <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
                                 <div className="w-full sm:w-32 h-20 sm:h-24 bg-gray-100 rounded-md overflow-hidden">
                                   <img
+                                    key={`property-${prop.id}`}
                                     src={
-                                      prop.image_urls || [],
-                                      "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=870&q=80"
+                                      prop.imageUrls && Array.isArray(prop.imageUrls) && prop.imageUrls.length > 0
+                                        ? formatImageUrl(prop.imageUrls[0])
+                                        : prop.imageUrls && typeof prop.imageUrls === 'string'
+                                          ? formatImageUrl(prop.imageUrls)
+                                          : prop.image_urls && Array.isArray(prop.image_urls) && prop.image_urls.length > 0
+                                            ? formatImageUrl(prop.image_urls[0])
+                                            : prop.image_urls && typeof prop.image_urls === 'string'
+                                              ? formatImageUrl(prop.image_urls)
+                                              : '/images/property-placeholder.jpg'
                                     }
-                                    alt={prop.title}
+                                    alt={prop.title || "Property"}
                                     className="w-full h-full object-cover"
+                                    loading="eager"
+                                    onError={(e) => {
+                                      e.currentTarget.src = '/images/property-placeholder.jpg';
+                                    }}
                                   />
                                 </div>
                                 <div className="flex-1">
@@ -632,12 +703,24 @@ export default function Dashboard() {
                               <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
                                 <div className="w-full sm:w-32 h-20 sm:h-24 bg-gray-100 rounded-md overflow-hidden">
                                   <img
+                                    key={`saved-property-${property.id}`}
                                     src={
-                                      property.imageUrls?.[0] ||
-                                      "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?ixlib=rb-4.0.3&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=870&q=80"
+                                      property.imageUrls && Array.isArray(property.imageUrls) && property.imageUrls.length > 0
+                                        ? formatImageUrl(property.imageUrls[0])
+                                        : property.imageUrls && typeof property.imageUrls === 'string'
+                                          ? formatImageUrl(property.imageUrls)
+                                          : property.image_urls && Array.isArray(property.image_urls) && property.image_urls.length > 0
+                                            ? formatImageUrl(property.image_urls[0])
+                                            : property.image_urls && typeof property.image_urls === 'string'
+                                              ? formatImageUrl(property.image_urls)
+                                              : '/images/property-placeholder.jpg'
                                     }
-                                    alt={property.title}
+                                    alt={property.title || "Property"}
                                     className="w-full h-full object-cover"
+                                    loading="eager"
+                                    onError={(e) => {
+                                      e.currentTarget.src = '/images/property-placeholder.jpg';
+                                    }}
                                   />
                                 </div>
                                 <div className="flex-1">
@@ -758,9 +841,14 @@ export default function Dashboard() {
                               <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-full overflow-hidden bg-gray-100 flex items-center justify-center border">
                                 {profileImage ? (
                                   <img
-                                    src={profileImage}
+                                    key="profile-image-main"
+                                    src={formatImageUrl(profileImage)}
                                     alt={user.name}
                                     className="w-full h-full object-cover"
+                                    loading="eager"
+                                    onError={(e) => {
+                                      e.currentTarget.src = '/images/avatar-placeholder.png';
+                                    }}
                                   />
                                 ) : (
                                   <User className="h-12 sm:h-16 w-12 sm:w-16 text-gray-400" />

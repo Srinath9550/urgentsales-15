@@ -15,8 +15,7 @@ import {
   Loader2 
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
-// Remove the timeout parameter which is not supported by our apiRequest function
+import { apiRequest } from "@/lib/api";
 
 export interface FileWithPreview {
   file: File;
@@ -202,7 +201,7 @@ export default function FileUpload({
       
       while (retries >= 0 && !responseData) {
         try {
-          responseData = await apiRequest<{ success: boolean, files: string[] }>({
+          responseData = await apiRequest({
             url: '/api/upload/property-images',
             method: 'POST',
             body: formData,
@@ -220,7 +219,27 @@ export default function FileUpload({
       }
       
       if (responseData && responseData.files && responseData.files.length > 0) {
-        console.log('File uploaded successfully. Server URL:', responseData.files[0]);
+        // Get the server URL from the response
+        const serverUrl = responseData.files[0];
+        console.log('File uploaded successfully. Server URL:', serverUrl);
+        
+        // Extract just the S3 key if it's a full S3 URL
+        let s3Key = serverUrl;
+        if (serverUrl.includes('amazonaws.com')) {
+          const parts = serverUrl.split('amazonaws.com/');
+          if (parts.length > 1) {
+            s3Key = parts[1];
+          }
+        }
+        
+        // Remove any curly braces that might be in the key
+        if (s3Key.startsWith('{') && s3Key.endsWith('}')) {
+          s3Key = s3Key.substring(1, s3Key.length - 1);
+          console.log('Removed curly braces from S3 key:', s3Key);
+        }
+        
+        console.log('Extracted S3 key:', s3Key);
+        
         // Update file with server URL
         setFiles(prevFiles => {
           const updatedFiles = prevFiles.map(f => 
@@ -229,8 +248,8 @@ export default function FileUpload({
                   ...f, 
                   uploadProgress: 100, 
                   status: 'success' as const,
-                  // Add server URL to the file object
-                  serverUrl: responseData.files[0]
+                  // Store just the S3 key instead of the full URL
+                  serverUrl: s3Key
                 } 
               : f
           );
@@ -239,7 +258,7 @@ export default function FileUpload({
           // Add a slight delay to ensure React has time to update the state
           setTimeout(() => {
             onFilesSelected(updatedFiles);
-            console.log('Notified parent about updated files with server URL:', responseData.files[0]);
+            console.log('Notified parent about updated files with S3 key:', s3Key);
           }, 100);
           
           return updatedFiles;

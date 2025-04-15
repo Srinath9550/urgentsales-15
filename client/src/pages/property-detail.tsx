@@ -25,6 +25,7 @@ import {
   CarouselPrevious,
   CarouselNext,
 } from "@/components/ui/carousel";
+import { formatImageUrl, processImageUrls, handleImageError, DEFAULT_PLACEHOLDER } from "@/lib/image-utils";
 import {
   MapPin,
   Bed,
@@ -43,11 +44,43 @@ import {
   ChevronRight,
   Expand,
   X,
+  Sofa,
+  Layout,
+  Car,
+  Compass,
+  Wifi,
+  Tv,
+  Fan,
+  ParkingSquare,
+  Armchair,
+  Fence,
+  TreePine,
+  Landmark,
+  Warehouse,
+  Factory,
+  Store,
+  ShieldCheck,
+  Dumbbell,
+  Waves,
+  Utensils,
+  Building,
+  Key,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+
+// Utility function for ordinal suffixes
+function getOrdinalSuffix(num: number) {
+  if (isNaN(num)) return "";
+  const j = num % 10;
+  const k = num % 100;
+  if (j === 1 && k !== 11) return "st";
+  if (j === 2 && k !== 12) return "nd";
+  if (j === 3 && k !== 13) return "rd";
+  return "th";
+};
 
 export default function PropertyDetail() {
   const { id } = useParams<{ id: string }>();
@@ -377,43 +410,29 @@ export default function PropertyDetail() {
     );
   }
 
-  // Use property images or a default image
-  const defaultImage = "/placeholder-property.jpg";
+  // Use the default image from image-utils
+  const defaultImage = DEFAULT_PLACEHOLDER;
   
-  // Validate image URLs to ensure they're valid strings
-  const validateImageUrls = (urls?: string[]) => {
-    if (!urls || !Array.isArray(urls)) {
-      console.log("Invalid image URLs array:", urls);
-      return [defaultImage];
-    }
+  // Process image URLs to use the direct API endpoint
+  const images = property.imageUrls && Array.isArray(property.imageUrls) 
+    ? property.imageUrls
+        .filter(url => url && typeof url === 'string' && url.trim() !== '')
+        .map(url => {
+          // If it's already a full URL, return it as is
+          if (url.startsWith('http://') || url.startsWith('https://')) {
+            return url;
+          }
+          // Make sure we're not double-encoding an already encoded URL
+          if (url.includes('/api/s3-image?key=')) {
+            return url;
+          }
+          // Otherwise, use the API endpoint
+          return `/api/s3-image?key=${encodeURIComponent(url)}`;
+        })
+    : [defaultImage];
     
-    // Filter out any invalid URLs (empty strings, undefined, etc.)
-    const validUrls = urls.filter(url => url && typeof url === 'string' && url.trim() !== '');
-    
-    if (validUrls.length === 0) {
-      console.log("No valid image URLs found in:", urls);
-    }
-    
-    // Process URLs to ensure they have the correct format
-    const processedUrls = validUrls.map(url => {
-      // Handle different URL formats
-      if (url.startsWith('http')) {
-        return url;
-      } else if (url.startsWith('/')) {
-        return url;
-      } else if (url.startsWith('uploads/')) {
-        return '/' + url;
-      } else {
-        // Add leading slash if missing
-        return '/' + url;
-      }
-    });
-    
-    console.log(`Property ${property.id} processed image URLs:`, processedUrls);
-    return processedUrls.length > 0 ? processedUrls : [defaultImage];
-  };
+  console.log(`Property ${property.id} has ${images.length} processed images:`, images);
   
-  const images = validateImageUrls(property.imageUrls);
   console.log(`Property ${property.id} has ${images.length} valid images:`, images);
       
   // Videos from property if available
@@ -504,8 +523,15 @@ export default function PropertyDetail() {
                             onError={(e) => {
                               console.log(`Error loading image at index ${index}:`, image);
                               handleImageError(index);
-                              e.currentTarget.onerror = null;
-                              e.currentTarget.src = defaultImage;
+                              // Try with the API endpoint if it's not already using it
+                              if (!image.includes('/api/s3-image') && property.imageUrls && property.imageUrls[index]) {
+                                const apiUrl = `/api/s3-image?key=${encodeURIComponent(property.imageUrls[index])}`;
+                                console.log(`Trying with API endpoint: ${apiUrl}`);
+                                (e.target as HTMLImageElement).src = apiUrl;
+                              } else {
+                                // If that fails too, use the default placeholder
+                                (e.target as HTMLImageElement).src = defaultImage;
+                              }
                             }}
                           />
                           
@@ -583,8 +609,7 @@ export default function PropertyDetail() {
                         onError={(e) => {
                           console.log(`Error loading thumbnail at index ${index}:`, image);
                           handleImageError(index);
-                          e.currentTarget.onerror = null;
-                          e.currentTarget.src = defaultImage;
+                          handleImageError(e);
                         }}
                       />
                     </div>
@@ -627,9 +652,9 @@ export default function PropertyDetail() {
                               console.log(`Fullscreen image loaded successfully at index ${index}:`, image);
                             }}
                             onError={(e) => {
+                              console.log(`Error loading fullscreen image at index ${index}:`, image);
                               handleImageError(index);
-                              e.currentTarget.onerror = null;
-                              e.currentTarget.src = defaultImage;
+                              handleImageError(e);
                             }}
                           />
                         </div>
@@ -665,9 +690,14 @@ export default function PropertyDetail() {
                     <div className="w-full md:w-1/2 mb-4 md:mb-0">
                       <h2 className="text-2xl font-bold text-gray-900">
                         {formatPrice(property.price)}
+                        {property.pricePerUnit && property.area && (
+                          <span className="text-base font-normal text-gray-500 ml-2">
+                            (₹{Math.round(property.price / property.area).toLocaleString('en-IN')}/sq.ft)
+                          </span>
+                        )}
                       </h2>
                       <p className="text-gray-500">
-                        {property.area && `${property.area} sq.ft`}
+                        {property.area && `${property.area} ${property.areaUnit || 'sq.ft'}`}
                         {property.bedrooms && ` · ${property.bedrooms} Beds`}
                         {property.bathrooms && ` · ${property.bathrooms} Baths`}
                       </p>
@@ -683,16 +713,48 @@ export default function PropertyDetail() {
                           )}
                         </span>
                       </div>
-                      <Badge
-                        variant="outline"
-                        className="bg-green-100 text-green-800 border-green-200"
-                      >
-                        Owner Direct
-                      </Badge>
+                      
+                      {/* Property badges */}
+                      <div className="flex flex-wrap gap-2">
+                        {property.userType && (
+                          <Badge
+                            variant="outline"
+                            className="bg-green-100 text-green-800 border-green-200"
+                          >
+                            {property.userType === 'owner' ? 'Owner Direct' : 
+                             property.userType === 'agent' ? 'Agent' : 
+                             property.userType === 'builder' ? 'Builder' : property.userType}
+                          </Badge>
+                        )}
+                        
+                        {property.transactionType && (
+                          <Badge
+                            variant="outline"
+                            className="bg-blue-100 text-blue-800 border-blue-200"
+                          >
+                            {property.transactionType === 'new' ? 'New Property' :
+                             property.transactionType === 'resale' ? 'Resale' :
+                             property.transactionType === 'rent' ? 'For Rent' :
+                             property.transactionType === 'under-construction' ? 'Under Construction' :
+                             property.transactionType === 'ready-to-move' ? 'Ready to Move' :
+                             property.transactionType}
+                          </Badge>
+                        )}
+                        
+                        {property.isUrgentSale && (
+                          <Badge
+                            variant="outline"
+                            className="bg-red-100 text-red-800 border-red-200"
+                          >
+                            Urgent Sale
+                          </Badge>
+                        )}
+                      </div>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                    {/* Main Property Features */}
                     {property.bedrooms && (
                       <div className="bg-gray-50 p-4 rounded-lg text-center">
                         <Bed className="h-5 w-5 mx-auto mb-2 text-gray-500" />
@@ -717,58 +779,501 @@ export default function PropertyDetail() {
                         <p className="text-gray-700 font-semibold">
                           {property.area}
                         </p>
-                        <p className="text-gray-500 text-sm">Sq. Ft.</p>
+                        <p className="text-gray-500 text-sm">{property.areaUnit || 'Sq. Ft.'}</p>
                       </div>
                     )}
                     <div className="bg-gray-50 p-4 rounded-lg text-center">
                       <HomeIcon className="h-5 w-5 mx-auto mb-2 text-gray-500" />
                       <p className="text-gray-700 font-semibold capitalize">
-                        {property.propertyType}
+                        {property.propertyType && property.propertyType.replace(/-/g, ' ')}
                       </p>
                       <p className="text-gray-500 text-sm">Property Type</p>
                     </div>
+                    
+                    {/* Additional property details */}
+                    {property.furnishedStatus && (
+                      <div className="bg-gray-50 p-4 rounded-lg text-center">
+                        <Sofa className="h-5 w-5 mx-auto mb-2 text-gray-500" />
+                        <p className="text-gray-700 font-semibold capitalize">
+                          {property.furnishedStatus.replace(/-/g, ' ')}
+                        </p>
+                        <p className="text-gray-500 text-sm">Furnishing</p>
+                      </div>
+                    )}
+                    {property.balconies && (
+                      <div className="bg-gray-50 p-4 rounded-lg text-center">
+                        <Layout className="h-5 w-5 mx-auto mb-2 text-gray-500" />
+                        <p className="text-gray-700 font-semibold">
+                          {property.balconies}
+                        </p>
+                        <p className="text-gray-500 text-sm">Balconies</p>
+                      </div>
+                    )}
+                    {property.parking && (
+                      <div className="bg-gray-50 p-4 rounded-lg text-center">
+                        <Car className="h-5 w-5 mx-auto mb-2 text-gray-500" />
+                        <p className="text-gray-700 font-semibold capitalize">
+                          {property.parking.replace(/-/g, ' ')}
+                        </p>
+                        <p className="text-gray-500 text-sm">Parking</p>
+                      </div>
+                    )}
+                    {property.facing && (
+                      <div className="bg-gray-50 p-4 rounded-lg text-center">
+                        <Compass className="h-5 w-5 mx-auto mb-2 text-gray-500" />
+                        <p className="text-gray-700 font-semibold capitalize">
+                          {property.facing.replace(/-/g, ' ')}
+                        </p>
+                        <p className="text-gray-500 text-sm">Facing</p>
+                      </div>
+                    )}
+                    
+                    {/* Property Status */}
+                    {property.possessionStatus && (
+                      <div className="bg-gray-50 p-4 rounded-lg text-center">
+                        <Key className="h-5 w-5 mx-auto mb-2 text-gray-500" />
+                        <p className="text-gray-700 font-semibold capitalize">
+                          {property.possessionStatus.replace(/-/g, ' ')}
+                        </p>
+                        <p className="text-gray-500 text-sm">Possession</p>
+                      </div>
+                    )}
+                    {property.constructionAge && (
+                      <div className="bg-gray-50 p-4 rounded-lg text-center">
+                        <Building className="h-5 w-5 mx-auto mb-2 text-gray-500" />
+                        <p className="text-gray-700 font-semibold capitalize">
+                          {property.constructionAge.replace(/-/g, ' ')}
+                        </p>
+                        <p className="text-gray-500 text-sm">Construction Age</p>
+                      </div>
+                    )}
+                    {property.floorNo && (
+                      <div className="bg-gray-50 p-4 rounded-lg text-center">
+                        <Building className="h-5 w-5 mx-auto mb-2 text-gray-500" />
+                        <p className="text-gray-700 font-semibold capitalize">
+                          {property.floorNo === 'ground' ? 'Ground Floor' : 
+                           property.floorNo === 'penthouse' ? 'Penthouse' : 
+                           property.floorNo === 'lower-basement' ? 'Lower Basement' :
+                           property.floorNo === 'upper-basement' ? 'Upper Basement' :
+                           `${property.floorNo}${getOrdinalSuffix(parseInt(property.floorNo))} Floor`}
+                        </p>
+                        <p className="text-gray-500 text-sm">Floor</p>
+                      </div>
+                    )}
+                    {property.totalFloors && (
+                      <div className="bg-gray-50 p-4 rounded-lg text-center">
+                        <Building className="h-5 w-5 mx-auto mb-2 text-gray-500" />
+                        <p className="text-gray-700 font-semibold">
+                          {property.totalFloors}
+                        </p>
+                        <p className="text-gray-500 text-sm">Total Floors</p>
+                      </div>
+                    )}
                   </div>
 
-                  <Tabs defaultValue="description">
-                    <TabsList className="mb-4">
-                      <TabsTrigger value="description">Description</TabsTrigger>
-                      <TabsTrigger value="features">Features</TabsTrigger>
-                      <TabsTrigger value="location">Location</TabsTrigger>
-                      <TabsTrigger value="media">Video & Virtual Tour</TabsTrigger>
-                    </TabsList>
-                    <TabsContent value="description">
+                  {/* Stacked sections instead of tabs */}
+                  <div className="space-y-8">
+                    {/* Description Section */}
+                    <div className="pb-6 border-b border-gray-200">
+                      <h2 className="text-xl font-bold mb-4 text-gray-900 flex items-center">
+                        <div className="w-1 h-6 bg-primary mr-3"></div>
+                        Description
+                      </h2>
                       <div className="space-y-4 text-gray-700">
                         <p>{property.description}</p>
                       </div>
-                    </TabsContent>
-                    <TabsContent value="features">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {[
-                          "Modern Kitchen",
-                          "Air Conditioning",
-                          "Balcony",
-                          "Power Backup",
-                          "Security",
-                          "Parking",
-                          "Swimming Pool",
-                          "Gym",
-                        ].map((feature, index) => (
-                          <div key={index} className="flex items-center">
-                            <Check className="h-4 w-4 mr-2 text-green-600" />
-                            <span>{feature}</span>
+                    </div>
+                    {/* Features Section */}
+                    <div className="pb-6 border-b border-gray-200">
+                      <h2 className="text-xl font-bold mb-4 text-gray-900 flex items-center">
+                        <div className="w-1 h-6 bg-primary mr-3"></div>
+                        Features
+                      </h2>
+                      <div className="space-y-6">
+                        {/* Amenities Section */}
+                        <div className="mb-6">
+                          <h3 className="text-lg font-semibold mb-3">Amenities</h3>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                            {property.amenities && property.amenities.length > 0 ? (
+                              property.amenities.map((amenity, index) => (
+                                <div key={index} className="flex items-center">
+                                  <Check className="h-4 w-4 mr-2 text-green-600" />
+                                  <span className="capitalize">{amenity.replace(/-/g, ' ')}</span>
+                                </div>
+                              ))
+                            ) : (
+                              <p className="text-gray-500 col-span-full">No amenities specified</p>
+                            )}
                           </div>
-                        ))}
-                      </div>
-                    </TabsContent>
-                    <TabsContent value="location">
-                      <div className="rounded-lg overflow-hidden bg-gray-100 h-[300px] flex items-center justify-center">
-                        <div className="text-center text-gray-500">
-                          <MapIcon className="h-12 w-12 mx-auto mb-2 text-gray-400" />
-                          <p>Map location: {property.address}</p>
+                        </div>
+
+                        {/* Property Details Section */}
+                        <div className="mb-6">
+                          <h3 className="text-lg font-semibold mb-3">Property Details</h3>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-y-4">
+                            {/* Basic Property Information */}
+                            {property.propertyType && (
+                              <div className="flex items-start">
+                                <div className="w-40 text-gray-500">Property Type</div>
+                                <div className="font-medium capitalize">{property.propertyType.replace(/-/g, ' ')}</div>
+                              </div>
+                            )}
+                            {property.propertyCategory && (
+                              <div className="flex items-start">
+                                <div className="w-40 text-gray-500">Category</div>
+                                <div className="font-medium capitalize">{property.propertyCategory.replace(/-/g, ' ')}</div>
+                              </div>
+                            )}
+                            {property.transactionType && (
+                              <div className="flex items-start">
+                                <div className="w-40 text-gray-500">Transaction Type</div>
+                                <div className="font-medium capitalize">{property.transactionType.replace(/-/g, ' ')}</div>
+                              </div>
+                            )}
+                            {property.area && (
+                              <div className="flex items-start">
+                                <div className="w-40 text-gray-500">Area</div>
+                                <div className="font-medium">
+                                  {property.area} {property.areaUnit || 'sq.ft'}
+                                </div>
+                              </div>
+                            )}
+                            {property.pricePerUnit && (
+                              <div className="flex items-start">
+                                <div className="w-40 text-gray-500">Price Per Unit</div>
+                                <div className="font-medium">
+                                  ₹{property.pricePerUnit.toLocaleString('en-IN')} per {property.areaUnit || 'sq.ft'}
+                                </div>
+                              </div>
+                            )}
+                            {property.totalPrice && (
+                              <div className="flex items-start">
+                                <div className="w-40 text-gray-500">Total Price</div>
+                                <div className="font-medium">
+                                  ₹{property.totalPrice.toLocaleString('en-IN')}
+                                </div>
+                              </div>
+                            )}
+                            
+                            {/* Property Configuration */}
+                            {property.bedrooms && (
+                              <div className="flex items-start">
+                                <div className="w-40 text-gray-500">Bedrooms</div>
+                                <div className="font-medium">{property.bedrooms}</div>
+                              </div>
+                            )}
+                            {property.bathrooms && (
+                              <div className="flex items-start">
+                                <div className="w-40 text-gray-500">Bathrooms</div>
+                                <div className="font-medium">{property.bathrooms}</div>
+                              </div>
+                            )}
+                            {property.balconies && (
+                              <div className="flex items-start">
+                                <div className="w-40 text-gray-500">Balconies</div>
+                                <div className="font-medium">{property.balconies}</div>
+                              </div>
+                            )}
+                            {property.floorNo && (
+                              <div className="flex items-start">
+                                <div className="w-40 text-gray-500">Floor</div>
+                                <div className="font-medium capitalize">
+                                  {property.floorNo === 'ground' ? 'Ground Floor' : 
+                                   property.floorNo === 'penthouse' ? 'Penthouse' : 
+                                   property.floorNo === 'lower-basement' ? 'Lower Basement' :
+                                   property.floorNo === 'upper-basement' ? 'Upper Basement' :
+                                   `${property.floorNo}${getOrdinalSuffix(parseInt(property.floorNo))} Floor`}
+                                </div>
+                              </div>
+                            )}
+                            {property.totalFloors && (
+                              <div className="flex items-start">
+                                <div className="w-40 text-gray-500">Total Floors</div>
+                                <div className="font-medium">{property.totalFloors}</div>
+                              </div>
+                            )}
+                            {property.floorsAllowedForConstruction && (
+                              <div className="flex items-start">
+                                <div className="w-40 text-gray-500">Floors Allowed</div>
+                                <div className="font-medium">{property.floorsAllowedForConstruction}</div>
+                              </div>
+                            )}
+                            
+                            {/* Property Features */}
+                            {property.furnishedStatus && (
+                              <div className="flex items-start">
+                                <div className="w-40 text-gray-500">Furnishing</div>
+                                <div className="font-medium capitalize">{property.furnishedStatus.replace(/-/g, ' ')}</div>
+                              </div>
+                            )}
+                            {property.facing && (
+                              <div className="flex items-start">
+                                <div className="w-40 text-gray-500">Facing</div>
+                                <div className="font-medium capitalize">{property.facing.replace(/-/g, ' ')}</div>
+                              </div>
+                            )}
+                            {property.parking && (
+                              <div className="flex items-start">
+                                <div className="w-40 text-gray-500">Parking</div>
+                                <div className="font-medium capitalize">{property.parking.replace(/-/g, ' ')}</div>
+                              </div>
+                            )}
+                            
+                            {/* Property Status */}
+                            {property.possessionStatus && (
+                              <div className="flex items-start">
+                                <div className="w-40 text-gray-500">Possession</div>
+                                <div className="font-medium capitalize">{property.possessionStatus.replace(/-/g, ' ')}</div>
+                              </div>
+                            )}
+                            {property.availableFromMonth && property.availableFromYear && (
+                              <div className="flex items-start">
+                                <div className="w-40 text-gray-500">Available From</div>
+                                <div className="font-medium">{property.availableFromMonth} {property.availableFromYear}</div>
+                              </div>
+                            )}
+                            {property.ownershipType && (
+                              <div className="flex items-start">
+                                <div className="w-40 text-gray-500">Ownership</div>
+                                <div className="font-medium capitalize">{property.ownershipType.replace(/-/g, ' ')}</div>
+                              </div>
+                            )}
+                            {property.constructionAge && (
+                              <div className="flex items-start">
+                                <div className="w-40 text-gray-500">Age of Construction</div>
+                                <div className="font-medium capitalize">{property.constructionAge.replace(/-/g, ' ')}</div>
+                              </div>
+                            )}
+                            {property.propertyAge && (
+                              <div className="flex items-start">
+                                <div className="w-40 text-gray-500">Property Age</div>
+                                <div className="font-medium capitalize">{property.propertyAge.replace(/-/g, ' ')}</div>
+                              </div>
+                            )}
+                            {property.yearBuilt && (
+                              <div className="flex items-start">
+                                <div className="w-40 text-gray-500">Year Built</div>
+                                <div className="font-medium">{property.yearBuilt}</div>
+                              </div>
+                            )}
+                            
+                            {/* Project Information */}
+                            {property.projectName && (
+                              <div className="flex items-start">
+                                <div className="w-40 text-gray-500">Project Name</div>
+                                <div className="font-medium">{property.projectName}</div>
+                              </div>
+                            )}
+                            {property.projectStatus && (
+                              <div className="flex items-start">
+                                <div className="w-40 text-gray-500">Project Status</div>
+                                <div className="font-medium capitalize">{property.projectStatus.replace(/-/g, ' ')}</div>
+                              </div>
+                            )}
+                            {property.launchDate && (
+                              <div className="flex items-start">
+                                <div className="w-40 text-gray-500">Launch Date</div>
+                                <div className="font-medium">{property.launchDate}</div>
+                              </div>
+                            )}
+                            {property.reraRegistered && (
+                              <div className="flex items-start">
+                                <div className="w-40 text-gray-500">RERA Registered</div>
+                                <div className="font-medium">{property.reraRegistered}</div>
+                              </div>
+                            )}
+                            {property.reraNumber && (
+                              <div className="flex items-start">
+                                <div className="w-40 text-gray-500">RERA Number</div>
+                                <div className="font-medium">{property.reraNumber}</div>
+                              </div>
+                            )}
+                            
+                            {/* Broker Information */}
+                            {property.brokerage && (
+                              <div className="flex items-start">
+                                <div className="w-40 text-gray-500">Brokerage</div>
+                                <div className="font-medium">{property.brokerage}</div>
+                              </div>
+                            )}
+                            {property.noBrokerResponses !== undefined && (
+                              <div className="flex items-start">
+                                <div className="w-40 text-gray-500">Broker Responses</div>
+                                <div className="font-medium">{property.noBrokerResponses ? 'Not Accepting' : 'Accepting'}</div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Additional Features Section */}
+                        <div className="mb-6">
+                          <h3 className="text-lg font-semibold mb-3">Additional Features</h3>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-y-4">
+                            {/* Land Features */}
+                            {property.boundaryWall && (
+                              <div className="flex items-start">
+                                <div className="w-40 text-gray-500">Boundary Wall</div>
+                                <div className="font-medium capitalize">{property.boundaryWall.replace(/-/g, ' ')}</div>
+                              </div>
+                            )}
+                            {property.roadWidth && (
+                              <div className="flex items-start">
+                                <div className="w-40 text-gray-500">Road Width</div>
+                                <div className="font-medium">{property.roadWidth} ft</div>
+                              </div>
+                            )}
+                            {property.openSides && (
+                              <div className="flex items-start">
+                                <div className="w-40 text-gray-500">Open Sides</div>
+                                <div className="font-medium">{property.openSides}</div>
+                              </div>
+                            )}
+                            
+                            {/* Utilities */}
+                            {property.electricityStatus && (
+                              <div className="flex items-start">
+                                <div className="w-40 text-gray-500">Electricity</div>
+                                <div className="font-medium capitalize">{property.electricityStatus.replace(/-/g, ' ')}</div>
+                              </div>
+                            )}
+                            {property.waterAvailability && (
+                              <div className="flex items-start">
+                                <div className="w-40 text-gray-500">Water Supply</div>
+                                <div className="font-medium capitalize">{property.waterAvailability.replace(/-/g, ' ')}</div>
+                              </div>
+                            )}
+                            
+                            {/* Interior Features */}
+                            {property.flooringType && (
+                              <div className="flex items-start">
+                                <div className="w-40 text-gray-500">Flooring</div>
+                                <div className="font-medium capitalize">{property.flooringType.replace(/-/g, ' ')}</div>
+                              </div>
+                            )}
+                            {property.overlooking && (
+                              <div className="flex items-start">
+                                <div className="w-40 text-gray-500">Overlooking</div>
+                                <div className="font-medium capitalize">{property.overlooking.replace(/-/g, ' ')}</div>
+                              </div>
+                            )}
+                            {property.preferredTenant && (
+                              <div className="flex items-start">
+                                <div className="w-40 text-gray-500">Preferred Tenant</div>
+                                <div className="font-medium capitalize">{property.preferredTenant.replace(/-/g, ' ')}</div>
+                              </div>
+                            )}                          
+                          </div>
                         </div>
                       </div>
-                    </TabsContent>
-                    <TabsContent value="media">
+                    </div>
+                    
+                    {/* Location Section */}
+                    <div className="pb-6 border-b border-gray-200">
+                      <h2 className="text-xl font-bold mb-4 text-gray-900 flex items-center">
+                        <div className="w-1 h-6 bg-primary mr-3"></div>
+                        Location
+                      </h2>
+                      <div className="space-y-6">
+                        {/* Map placeholder */}
+                        <div className="rounded-lg overflow-hidden bg-gray-100 h-[300px] flex items-center justify-center mb-6">
+                          <div className="text-center text-gray-500">
+                            <MapIcon className="h-12 w-12 mx-auto mb-2 text-gray-400" />
+                            <p>Map location: {property.address}</p>
+                          </div>
+                        </div>
+                        
+                        {/* Location details */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div>
+                            <h3 className="text-lg font-semibold mb-3">Location Details</h3>
+                            <div className="space-y-4">
+                              <div className="flex items-start">
+                                <MapPin className="h-5 w-5 mr-2 text-gray-500 mt-0.5" />
+                                <div>
+                                  <p className="font-medium">{property.address || property.location}</p>
+                                  <p className="text-gray-500">{property.city}</p>
+                                </div>
+                              </div>
+                              
+                              {property.pincode && (
+                                <div className="flex items-start">
+                                  <div className="w-7 flex-shrink-0">
+                                    <MapPin className="h-5 w-5 text-gray-500" />
+                                  </div>
+                                  <div>
+                                    <p className="text-gray-700">Pincode: {property.pincode}</p>
+                                  </div>
+                                </div>
+                              )}
+                              
+                              {property.landmarks && (
+                                <div className="flex items-start">
+                                  <div className="w-7 flex-shrink-0">
+                                    <Landmark className="h-5 w-5 text-gray-500" />
+                                  </div>
+                                  <div>
+                                    <p className="text-gray-700 font-medium">Landmarks</p>
+                                    <p className="text-gray-600">{property.landmarks}</p>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          
+                          {/* Nearby amenities or additional location info */}
+                          <div>
+                            {property.projectName && (
+                              <div className="mb-4">
+                                <h3 className="text-lg font-semibold mb-3">Project Details</h3>
+                                <div className="flex items-start">
+                                  <div className="w-7 flex-shrink-0">
+                                    <Building className="h-5 w-5 text-gray-500" />
+                                  </div>
+                                  <div>
+                                    <p className="text-gray-700 font-medium">Project Name</p>
+                                    <p className="text-gray-600">{property.projectName}</p>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                            
+                            <div className="mb-4">
+                              <h3 className="text-lg font-semibold mb-3">Access Details</h3>
+                              {property.roadWidth && (
+                                <div className="flex items-start mb-3">
+                                  <div className="w-7 flex-shrink-0">
+                                    <Car className="h-5 w-5 text-gray-500" />
+                                  </div>
+                                  <div>
+                                    <p className="text-gray-700 font-medium">Road Width</p>
+                                    <p className="text-gray-600">{property.roadWidth} ft</p>
+                                  </div>
+                                </div>
+                              )}
+                              
+                              {property.openSides && (
+                                <div className="flex items-start">
+                                  <div className="w-7 flex-shrink-0">
+                                    <Compass className="h-5 w-5 text-gray-500" />
+                                  </div>
+                                  <div>
+                                    <p className="text-gray-700 font-medium">Open Sides</p>
+                                    <p className="text-gray-600">{property.openSides} {parseInt(property.openSides) === 1 ? 'Side' : 'Sides'}</p>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Video & Virtual Tour Section */}
+                    <div className="pb-6">
+                      <h2 className="text-xl font-bold mb-4 text-gray-900 flex items-center">
+                        <div className="w-1 h-6 bg-primary mr-3"></div>
+                        Video & Virtual Tour
+                      </h2>
                       <div className="space-y-6">
                         {videos && videos.length > 0 ? (
                           <div>
@@ -776,10 +1281,10 @@ export default function PropertyDetail() {
                             {videos.map((videoUrl, index) => (
                               <div key={index} className="rounded-lg overflow-hidden bg-gray-100 h-[300px] mb-4">
                                 <video 
-                                  src={videoUrl} 
+                                  src={formatImageUrl(videoUrl)} 
                                   controls 
                                   className="w-full h-full object-contain"
-                                  poster={property.imageUrls && property.imageUrls.length > 0 ? property.imageUrls[0] : undefined}
+                                  poster={images && images.length > 0 ? images[0] : defaultImage}
                                 >
                                   Your browser does not support the video tag.
                                 </video>
@@ -800,17 +1305,27 @@ export default function PropertyDetail() {
                             <h3 className="text-lg font-medium mb-3">Virtual Tour</h3>
                             <div className="rounded-lg overflow-hidden bg-gray-100 h-[300px]">
                               <iframe 
-                                src={property.virtualTourUrl} 
+                                src={formatImageUrl(property.virtualTourUrl)} 
                                 className="w-full h-full border-0"
                                 allowFullScreen
                                 title="Virtual Tour"
+                                onError={(e) => {
+                                  console.log("Error loading virtual tour:", property.virtualTourUrl);
+                                  // Hide the iframe if it fails to load
+                                  e.currentTarget.style.display = 'none';
+                                  // Show an error message
+                                  const errorDiv = document.createElement('div');
+                                  errorDiv.className = 'flex items-center justify-center h-full bg-gray-100 text-gray-500';
+                                  errorDiv.innerHTML = 'Virtual tour could not be loaded';
+                                  e.currentTarget.parentNode?.appendChild(errorDiv);
+                                }}
                               ></iframe>
                             </div>
                           </div>
                         ) : null}
                       </div>
-                    </TabsContent>
-                  </Tabs>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
 

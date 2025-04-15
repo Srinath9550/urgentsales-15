@@ -188,7 +188,12 @@ export default function AddProperty() {
             .filter((url) => url.length > 0)
         : [];
 
-      processedData.imageUrlsInput = [...existingUrls, ...fileUrls].join(",");
+      // Create a JSON array string for imageUrls
+      const allUrls = [...existingUrls, ...fileUrls];
+      processedData.imageUrlsInput = allUrls.join(",");
+      
+      // Add imageUrls as a JSON string array to ensure proper storage in database
+      (processedData as any).imageUrls = JSON.stringify(allUrls);
     }
 
     // Set premium status based on subscription level

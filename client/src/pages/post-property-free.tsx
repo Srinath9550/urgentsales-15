@@ -458,6 +458,17 @@ const getAreaUnitOptions = (propertyType: string) => {
   return baseUnits;
 };
 
+// Format price in Indian format (lakhs, crores)
+const formatIndianPrice = (price: number) => {
+  if (price >= 10000000) {
+    return `₹${(price / 10000000).toFixed(2)} Cr`;
+  } else if (price >= 100000) {
+    return `₹${(price / 100000).toFixed(2)} Lac`;
+  } else {
+    return `₹${price.toLocaleString()}`;
+  }
+};
+
 export default function PostPropertyFree() {
   const { user } = useAuth();
   const [_, setLocation] = useLocation();
@@ -493,9 +504,9 @@ export default function PostPropertyFree() {
       propertyType: "",
       propertyCategory: "",
       transactionType: "",
-      price: undefined,
-      pricePerUnit: undefined,
-      totalPrice: undefined,
+      price: 0,
+      pricePerUnit: 0,
+      totalPrice: 0,
       isUrgentSale: false,
       location: "",
       city: "",
@@ -887,7 +898,7 @@ export default function PostPropertyFree() {
           console.log("Current form values:", formValues);
           
           // Manually call onSubmit with the form values
-          onSubmit(formValues);
+          onSubmit(formValues, new Event('submit') as React.FormEvent);
         }, 500);
         
         return;
@@ -916,7 +927,7 @@ export default function PostPropertyFree() {
           console.log("Current form values:", formValues);
           
           // Manually call onSubmit with the form values
-          onSubmit(formValues);
+          onSubmit(formValues, new Event('submit') as React.FormEvent);
         }, 500);
       } else {
         setIsLoading(false);
@@ -1018,6 +1029,9 @@ export default function PostPropertyFree() {
     mutationFn: async (formData: FormData) => {
       console.log("Starting property submission with FormData");
       
+      // Add a debug flag to log the request on the server
+      formData.append('debug', 'true');
+      
       // First, collect all the server URLs from uploaded images
       const imageUrls: string[] = [];
       
@@ -1042,7 +1056,33 @@ export default function PostPropertyFree() {
       // Add the image URLs to the form data
       if (imageUrls.length > 0) {
         console.log(`Adding ${imageUrls.length} uploaded image URLs to form data`);
-        formData.append('imageUrls', JSON.stringify(imageUrls));
+        
+        // Clean up any URLs that might have curly braces
+        const cleanedUrls = imageUrls.map(url => {
+          if (typeof url === 'string' && url.startsWith('{') && url.endsWith('}')) {
+            return url.substring(1, url.length - 1);
+          }
+          return url;
+        });
+        
+        console.log('Cleaned image URLs:', cleanedUrls);
+        
+        // Add as JSON string
+        formData.append('imageUrls', JSON.stringify(cleanedUrls));
+        
+        // Also add individual URLs for debugging
+        cleanedUrls.forEach((url, index) => {
+          formData.append(`imageUrl_${index}`, url);
+        });
+        
+        // Add exterior URLs separately if available
+        const exteriorUrls = extractServerUrls(exteriorImages);
+        if (exteriorUrls.length > 0) {
+          exteriorUrls.forEach((url, index) => {
+            console.log(`Found exterior URL at index ${index}: ${url}`);
+            formData.append(`exterior_urls_${index}`, url);
+          });
+        }
       }
       
       // Add a debug flag
@@ -1065,6 +1105,12 @@ export default function PostPropertyFree() {
       }
       
       try {
+        // Log the form data entries for debugging
+        console.log("Form data entries being sent to server:");
+        for (const pair of formData.entries()) {
+          console.log(pair[0], typeof pair[1] === 'string' ? pair[1] : 'File object');
+        }
+        
         // Don't manually set Content-Type with FormData as the browser needs to set the boundary
         const response = await fetch('/api/properties/free', {
           method: 'POST',
@@ -1125,39 +1171,10 @@ export default function PostPropertyFree() {
     },
     onError: (error: any) => {
       console.error("Property submission error:", error);
-      
-      // Ensure loading state is turned off
-      setIsLoading(false);
-      
-      // Log error in a very visible way
-      console.error("========================================");
-      console.error("PROPERTY SUBMISSION FAILED!");
-      console.error("Error:", error);
-      console.error("========================================");
-      
-      // Try to extract more detailed error information
-      let errorMessage = "Failed to list property";
-      
-      if (error?.response?.data?.message) {
-        errorMessage = error.response.data.message;
-      } else if (error?.response?.data?.error) {
-        errorMessage = error.response.data.error;
-      } else if (error?.message) {
-        errorMessage = error.message;
-      }
-      
       toast({
         title: "Error",
-        description: errorMessage,
+        description: error.message || "Failed to submit property",
         variant: "destructive",
-      });
-      
-      // Show a more detailed toast with troubleshooting steps
-      toast({
-        title: "Troubleshooting",
-        description: "Please check your internet connection and try again. If the problem persists, contact support.",
-        variant: "destructive",
-        duration: 7000, // Show for longer
       });
     },
   });
@@ -1173,6 +1190,7 @@ export default function PostPropertyFree() {
     // Ensure each file has the required properties
     const currentFiles = files.map(file => {
       // Make sure we have all required properties of FileWithPreview
+      console.log("Uploaded file server URLs:", file.serverUrl);
       return {
         file: file.file,
         id: file.id,
@@ -1247,9 +1265,13 @@ export default function PostPropertyFree() {
     ].length;
   };
 
-  const onSubmit = async (data: PropertyFormValues) => {
+  const onSubmit = async (data: PropertyFormValues, event: React.FormEvent) => {
+    event.preventDefault(); // Prevent default form submission behavior
     console.log("Form submission started with data:", data);
     
+    // Log the form data for debugging
+    console.log("Form data to be submitted:", JSON.stringify(data, null, 2));
+
     // Validate email is present
     if (!data.contactEmail) {
       toast({
@@ -1259,7 +1281,7 @@ export default function PostPropertyFree() {
       });
       return;
     }
-    
+
     // If OTP is not verified, send OTP and show verification modal
     if (!otpVerified) {
       console.log("OTP not verified yet, sending OTP to:", data.contactEmail);
@@ -1268,11 +1290,11 @@ export default function PostPropertyFree() {
         description: "We need to verify your email before submitting",
         variant: "default",
       });
-      
+
       setIsLoading(true); // Show loading state while sending OTP
       const otpSent = await sendOtp(data.contactEmail);
       setIsLoading(false);
-      
+
       if (otpSent) {
         console.log("OTP sent successfully, showing OTP modal");
         setShowOtpModal(true);
@@ -1290,146 +1312,60 @@ export default function PostPropertyFree() {
     // If we get here, OTP is verified, proceed with form submission
     console.log("OTP verified, proceeding with form submission");
     console.log("Form data to submit:", data);
-    // Note: We don't need to set isLoading here as isSubmitting from useMutation will handle it
-    
+
     try {
-      // Create a new FormData object for the submission
       const formData = new FormData();
-      console.log("Created FormData object for submission");
 
-      // Validate arrays for debugging
-      if (!Array.isArray(data.amenities)) {
-        console.warn("Amenities is not an array:", data.amenities);
-        data.amenities = [];
-      }
-
-      // Log all form data for debugging
-      console.log("Full form data to be processed:", JSON.stringify(data, null, 2));
-
-      // Enhanced mapping of form values to API fields
-      // Map exactly what the API expects
+      // Map form values to FormData
       Object.entries(data).forEach(([key, value]) => {
         if (value !== undefined && key !== "otp") {
-          // Handle specific fields that need special treatment
-          if (key === "amenities" && Array.isArray(value)) {
-            // Ensure amenities are serialized correctly in multiple formats
-            // Only append amenities if there are any selected
-            if (value.length > 0) {
-              // Add both as comma-separated string and as JSON array for server compatibility
-              formData.append('amenities', value.join(','));
-              formData.append('amenitiesArray', JSON.stringify(value));
-              console.log("Adding amenities:", value.join(','));
-              console.log("Adding amenitiesArray:", JSON.stringify(value));
-            }
-          } else if (Array.isArray(value)) {
-            // Handle any other array values
-            formData.append(key, JSON.stringify(value));
-            console.log(`Adding array field ${key}:`, JSON.stringify(value));
-          } else if (value !== null) {
-            // Handle regular values
-            formData.append(key, value.toString());
-            
-            // Log all fields for debugging
-            console.log(`Adding field ${key}:`, value.toString());
-          }
+          formData.append(key, value.toString());
         }
       });
-      
-      // Add required fields explicitly for database compatibility
-      formData.append('address', data.location || ''); // Use location as address if not provided
-      formData.append('rentOrSale', data.transactionType === 'rent' ? 'rent' : 'sale');
-      
-      // Add a timestamp to prevent caching issues
-      formData.append('timestamp', Date.now().toString());
-      
-      // Add a flag to indicate this is a verified submission
-      formData.append('emailVerified', 'true');
 
-      // Helper function to add images to FormData with proper naming
+      // Add images to FormData
       const addImagesToFormData = (images: FileWithPreview[], prefix: string) => {
         images.forEach((file, index) => {
-          // If the file has a serverUrl, use that instead of uploading the file again
           if (file.serverUrl) {
-            console.log(`Adding ${prefix} image ${index} with serverUrl:`, file.serverUrl);
             formData.append(`${prefix}_urls_${index}`, file.serverUrl);
-            formData.append(`${prefix}_names_${index}`, file.name || file.file.name);
-          } 
-          // Otherwise upload the file if it exists
-          else if (file && file.file) {
-            console.log(`Adding ${prefix} image ${index}:`, file.file.name);
+          } else if (file.file) {
             formData.append(`${prefix}_${index}`, file.file);
-            if (file.name) {
-              formData.append(`${prefix}_names_${index}`, file.name);
-            } else {
-              formData.append(`${prefix}_names_${index}`, file.file.name); // Fallback to file.file.name
-            }
-          } else {
-            console.warn(`Skipping invalid ${prefix} image at index ${index}`);
           }
         });
       };
 
-      // Add all images to FormData with their categories
-      console.log("Adding images to FormData:");
-      addImagesToFormData(exteriorImages, 'exterior');
-      addImagesToFormData(livingRoomImages, 'livingRoom');
-      addImagesToFormData(kitchenImages, 'kitchen');
-      addImagesToFormData(bedroomImages, 'bedroom');
-      addImagesToFormData(bathroomImages, 'bathroom');
-      addImagesToFormData(floorPlanImages, 'floorPlan');
-      addImagesToFormData(masterPlanImages, 'masterPlan');
-      addImagesToFormData(locationMapImages, 'locationMap');
-      addImagesToFormData(otherImages, 'other');
-      addImagesToFormData(videoFiles, 'video');
+      addImagesToFormData(exteriorImages, "exterior");
+      addImagesToFormData(livingRoomImages, "livingRoom");
+      addImagesToFormData(kitchenImages, "kitchen");
+      addImagesToFormData(bedroomImages, "bedroom");
+      addImagesToFormData(bathroomImages, "bathroom");
+      addImagesToFormData(floorPlanImages, "floorPlan");
+      addImagesToFormData(masterPlanImages, "masterPlan");
+      addImagesToFormData(locationMapImages, "locationMap");
+      addImagesToFormData(otherImages, "other");
 
-      // Log the FormData entries for debugging
-      console.log("FormData entries:");
-      for (const pair of formData.entries()) {
-        if (typeof pair[1] === 'string') {
-          console.log(pair[0], pair[1]);
-        } else {
-          console.log(pair[0], 'File object');
-        }
-      }
-
-      // Submit the property data
-      console.log("Calling submitProperty with FormData");
+      console.log("Submitting property with FormData:", formData);
       submitProperty(formData);
     } catch (error) {
-      setIsLoading(false);
-      console.error("Error preparing property submission:", error);
+      console.error("Error during form submission:", error);
       toast({
-        title: "Error",
-        description: "An unexpected error occurred while preparing your submission",
+        title: "Submission Error",
+        description: "An error occurred while submitting the form. Please try again.",
         variant: "destructive",
       });
-      
-      // Show more detailed error for debugging
-      if (error instanceof Error) {
-        console.error("Error details:", error.message, error.stack);
-        toast({
-          title: "Technical Error",
-          description: `Error: ${error.message}`,
-          variant: "destructive",
-          duration: 10000,
-        });
-      }
     }
   };
 
-  // Add this after your imports
-const formatIndianPrice = (price: number): string => {
-  if (isNaN(price)) return "";
-  
-  if (price >= 10000000) { // 1 crore or more
-    return `${(price / 10000000).toFixed(2)} Cr`;
-  } else if (price >= 100000) { // 1 lakh or more
-    return `${(price / 100000).toFixed(2)} L`;
-  } else {
-    return price.toLocaleString('en-IN');
-  }
-};
-
+  const renderImage = (file: FileWithPreview) => {
+    return (
+      <img
+        key={file.id}
+        src={file.serverUrl || file.preview}
+        alt={file.name}
+        className="w-full h-full object-cover"
+      />
+    );
+  };
 
   const renderFormStep = () => {
     switch (currentStep) {
@@ -2705,11 +2641,7 @@ const formatIndianPrice = (price: number): string => {
                           {exteriorImages.map((file) => (
                             <div key={file.id} className="relative group">
                               <div className="aspect-square rounded-md overflow-hidden border bg-gray-100">
-                                <img 
-                                  src={file.serverUrl || file.preview} 
-                                  alt={file.name}
-                                  className="w-full h-full object-cover"
-                                />
+                                {renderImage(file)}
                               </div>
                               <div className="absolute inset-x-0 bottom-0 bg-black bg-opacity-60 text-white text-xs p-1 truncate">
                                 {file.name}
@@ -2763,11 +2695,7 @@ const formatIndianPrice = (price: number): string => {
                           {livingRoomImages.map((file) => (
                             <div key={file.id} className="relative group">
                               <div className="aspect-square rounded-md overflow-hidden border bg-gray-100">
-                                <img 
-                                  src={file.serverUrl || file.preview} 
-                                  alt={file.name}
-                                  className="w-full h-full object-cover"
-                                />
+                                {renderImage(file)}
                               </div>
                               <div className="absolute inset-x-0 bottom-0 bg-black bg-opacity-60 text-white text-xs p-1 truncate">
                                 {file.name}
@@ -2813,11 +2741,7 @@ const formatIndianPrice = (price: number): string => {
                           {kitchenImages.map((file) => (
                             <div key={file.id} className="relative group">
                               <div className="aspect-square rounded-md overflow-hidden border bg-gray-100">
-                                <img 
-                                  src={file.serverUrl || file.preview} 
-                                  alt={file.name}
-                                  className="w-full h-full object-cover"
-                                />
+                                {renderImage(file)}
                               </div>
                               <div className="absolute inset-x-0 bottom-0 bg-black bg-opacity-60 text-white text-xs p-1 truncate">
                                 {file.name}
@@ -2863,11 +2787,7 @@ const formatIndianPrice = (price: number): string => {
                           {bedroomImages.map((file) => (
                             <div key={file.id} className="relative group">
                               <div className="aspect-square rounded-md overflow-hidden border bg-gray-100">
-                                <img 
-                                  src={file.serverUrl || file.preview} 
-                                  alt={file.name}
-                                  className="w-full h-full object-cover"
-                                />
+                                {renderImage(file)}
                               </div>
                               <div className="absolute inset-x-0 bottom-0 bg-black bg-opacity-60 text-white text-xs p-1 truncate">
                                 {file.name}
@@ -2913,11 +2833,7 @@ const formatIndianPrice = (price: number): string => {
                           {bathroomImages.map((file) => (
                             <div key={file.id} className="relative group">
                               <div className="aspect-square rounded-md overflow-hidden border bg-gray-100">
-                                <img 
-                                  src={file.serverUrl || file.preview} 
-                                  alt={file.name}
-                                  className="w-full h-full object-cover"
-                                />
+                                {renderImage(file)}
                               </div>
                               <div className="absolute inset-x-0 bottom-0 bg-black bg-opacity-60 text-white text-xs p-1 truncate">
                                 {file.name}
@@ -2963,11 +2879,7 @@ const formatIndianPrice = (price: number): string => {
                           {floorPlanImages.map((file) => (
                             <div key={file.id} className="relative group">
                               <div className="aspect-square rounded-md overflow-hidden border bg-gray-100">
-                                <img 
-                                  src={file.serverUrl || file.preview} 
-                                  alt={file.name}
-                                  className="w-full h-full object-cover"
-                                />
+                                {renderImage(file)}
                               </div>
                               <div className="absolute inset-x-0 bottom-0 bg-black bg-opacity-60 text-white text-xs p-1 truncate">
                                 {file.name}
@@ -3016,11 +2928,7 @@ const formatIndianPrice = (price: number): string => {
                             {masterPlanImages.map((file) => (
                               <div key={file.id} className="relative group">
                                 <div className="aspect-square rounded-md overflow-hidden border bg-gray-100">
-                                  <img 
-                                    src={file.preview} 
-                                    alt={file.name}
-                                    className="w-full h-full object-cover"
-                                  />
+                                  {renderImage(file)}
                                 </div>
                                 <div className="absolute inset-x-0 bottom-0 bg-black bg-opacity-60 text-white text-xs p-1 truncate">
                                   {file.name}
@@ -3067,11 +2975,7 @@ const formatIndianPrice = (price: number): string => {
                           {locationMapImages.map((file) => (
                             <div key={file.id} className="relative group">
                               <div className="aspect-square rounded-md overflow-hidden border bg-gray-100">
-                                <img 
-                                  src={file.serverUrl || file.preview} 
-                                  alt={file.name}
-                                  className="w-full h-full object-cover"
-                                />
+                                {renderImage(file)}
                               </div>
                               <div className="absolute inset-x-0 bottom-0 bg-black bg-opacity-60 text-white text-xs p-1 truncate">
                                 {file.name}
@@ -3117,11 +3021,7 @@ const formatIndianPrice = (price: number): string => {
                           {otherImages.map((file) => (
                             <div key={file.id} className="relative group">
                               <div className="aspect-square rounded-md overflow-hidden border bg-gray-100">
-                                <img 
-                                  src={file.serverUrl || file.preview} 
-                                  alt={file.name}
-                                  className="w-full h-full object-cover"
-                                />
+                                {renderImage(file)}
                               </div>
                               <div className="absolute inset-x-0 bottom-0 bg-black bg-opacity-60 text-white text-xs p-1 truncate">
                                 {file.name}
@@ -3492,18 +3392,26 @@ const formatIndianPrice = (price: number): string => {
                 size="lg"
                 className="bg-green-600 hover:bg-green-700"
                 disabled={isSubmitting}
+                onClick={() => {
+                  console.log("Submit button clicked");
+                  // Validate the form fields before submission
+                  form.trigger(["contactName", "contactPhone", "contactEmail"]).then((isValid) => {
+                    if (isValid) {
+                      console.log("Form is valid, submitting...");
+                      const formValues = form.getValues();
+                      onSubmit(formValues, new Event('submit') as React.FormEvent);
+                    } else {
+                      console.log("Form validation failed");
+                      toast({
+                        title: "Validation Error",
+                        description: "Please fill in all required fields correctly",
+                        variant: "destructive",
+                      });
+                    }
+                  });
+                }}
               >
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                    Submitting...
-                  </>
-                ) : (
-                  <>
-                    Submit Property
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </>
-                )}
+                {isSubmitting ? "Submitting..." : "Submit Property"}
               </Button>
             </div>
           </div>
@@ -3558,7 +3466,7 @@ const formatIndianPrice = (price: number): string => {
 
             <CardContent className="p-6">
               <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                <form onSubmit={(e) => form.handleSubmit(onSubmit)(e)} className="space-y-6">
                   {renderFormStep()}
                 </form>
               </Form>
@@ -3675,3 +3583,13 @@ const formatIndianPrice = (price: number): string => {
     </div>
   );
 }
+
+const corsConfig = [
+  {
+    "AllowedHeaders": ["*"],
+    "AllowedMethods": ["GET", "POST", "PUT", "DELETE"],
+    "AllowedOrigins": ["*"],
+    "ExposeHeaders": ["ETag"],
+    "MaxAgeSeconds": 3000
+  }
+];

@@ -32,7 +32,7 @@ router.post('/', async (req, res) => {
     const insertQuery = `
       INSERT INTO property_interests (
         property_id, 
-        name, 
+        user_name, 
         email, 
         phone, 
         message, 

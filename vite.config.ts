@@ -22,6 +22,13 @@ export default defineConfig({
         ]
       : []),
   ],
+  server: {
+    hmr: {
+      protocol: 'ws',
+      host: 'localhost',
+      port: parseInt(process.env.VITE_WS_PORT || '5000')
+    }
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "client", "src"),
