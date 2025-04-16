@@ -179,7 +179,14 @@ export async function initializeDatabase() {
                              tablesExist.rows[0].ad_packages_exists &&
                              tablesExist.rows[0].user_subscriptions_exists;
       
-      if (!allTablesExist) {
+      // Also check for property_interests table
+      const propertyInterestsExists = await client.query(`
+        SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'property_interests')
+      `);
+      
+      console.log('Property interests table exists:', propertyInterestsExists.rows[0].exists);
+      
+      if (!allTablesExist || !propertyInterestsExists.rows[0].exists) {
         console.log('Creating missing database tables...');
         
         // Manually create tables if they don't exist
@@ -353,47 +360,77 @@ export async function initializeDatabase() {
 );
 CREATE TABLE IF NOT EXISTS projects (
   id SERIAL PRIMARY KEY,
-  title TEXT,
-  description TEXT,
-  location TEXT,
-  city TEXT,
+  title TEXT NOT NULL,
+  description TEXT NOT NULL,
+  location TEXT NOT NULL,
+  city TEXT NOT NULL,
   state TEXT,
   price TEXT,
   price_range TEXT,
-  bhk_config TEXT,
-  builder TEXT,
+  bhk_config TEXT NOT NULL,
+  builder TEXT NOT NULL,
   possession_date TEXT,
-  category TEXT,
-  status TEXT,
+  category TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'upcoming',
   amenities TEXT[],
   tags TEXT[],
-  image_url TEXT,
+  image_urls TEXT[], -- Array for multiple images
   gallery_urls TEXT[],
-  featured BOOLEAN,
-  rating DOUBLE PRECISION,
+  image_url TEXT, -- Single image URL from SQL schema
+  location_map_url TEXT,
+  master_plan_url TEXT,
+  floor_plan_urls TEXT[],
+  specification_urls TEXT[],
+  youtube_url TEXT,
+  about_project_image_url TEXT,
+  developer_logo_url TEXT,
+  bhk2_sizes TEXT[],
+  bhk3_sizes TEXT[],
+  location_advantages TEXT,
+  loan_amount TEXT,
+  interest_rate TEXT,
+  loan_tenure TEXT,
+  premium_features TEXT,
+  exclusive_services TEXT,
+  affordability_features TEXT,
+  financial_schemes TEXT,
+  commercial_type TEXT,
+  business_amenities TEXT,
+  launch_date TIMESTAMP,
+  launch_offers TEXT,
+  expected_completion_date TEXT,
+  completion_date TIMESTAMP, -- From SQL schema
+  construction_status TEXT,
+  sale_deadline TEXT,
+  urgency_reason TEXT,
+  discount_offered TEXT,
+  highlight_features TEXT,
+  accolades TEXT,
+  listing_date TEXT,
+  special_intro_offer TEXT,
+  company_profile TEXT,
+  past_projects TEXT,
+  rera_number TEXT,
+  rera_registered BOOLEAN,
   total_area TEXT,
   starting_price TEXT,
-  approval_status TEXT,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  image_urls TEXT[],
+  featured BOOLEAN DEFAULT FALSE,
+  rating DOUBLE PRECISION,
   contact_number TEXT,
-  user_id INTEGER,
-  approved_by INTEGER,
   contact_email TEXT,
   contact_name TEXT,
   contact_phone TEXT,
   contact_position TEXT,
-  approved_at TIMESTAMP,
-  approval_date TIMESTAMP,
-  completion_date TIMESTAMP,
-  launch_date TIMESTAMP,
+  user_id INTEGER NOT NULL,
+  approval_status TEXT NOT NULL DEFAULT 'pending',
+  approved_by INTEGER,
+  approval_date TIMESTAMP, -- Consolidated approval_date and approved_at
   rejection_reason TEXT,
-  rejected_at TIMESTAMP,
   rejected_by INTEGER,
-  rera_number TEXT,
-  rera_registered BOOLEAN,
-  project_status TEXT
+  rejected_at TIMESTAMP,
+  project_status TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP
 );
 CREATE TABLE IF NOT EXISTS referrals (
   id SERIAL PRIMARY KEY,
@@ -414,6 +451,24 @@ CREATE TABLE IF NOT EXISTS referrals (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+          CREATE TABLE IF NOT EXISTS property_interests (
+            id SERIAL PRIMARY KEY,
+            property_id INTEGER NOT NULL,
+            user_id INTEGER NULL, -- Added nullable user_id column for authenticated users
+            user_name VARCHAR(255) NOT NULL,
+            email VARCHAR(255) NOT NULL,
+            phone VARCHAR(20) NOT NULL,
+            message TEXT,
+            created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+            updated_at TIMESTAMP
+          );
+          
+          -- Add index for faster lookups by property_id
+          CREATE INDEX IF NOT EXISTS idx_property_interests_property_id ON property_interests(property_id);
+          
+          -- Add index for faster lookups by email
+          CREATE INDEX IF NOT EXISTS idx_property_interests_email ON property_interests(email);
+          
           CREATE TABLE IF NOT EXISTS ad_packages (
             id SERIAL PRIMARY KEY,
             name TEXT NOT NULL,

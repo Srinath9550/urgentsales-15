@@ -82,60 +82,13 @@ export default function LocationSelector() {
   const { toast } = useToast();
 
   useEffect(() => {
-    const detectUserLocation = async () => {
-      try {
-        // Set default location to Hyderabad
-        setCityLocation("Hyderabad");
-        setSelectedState("telangana");
-        
-        // Try to get more precise location if geolocation is available
-        if (navigator.geolocation) {
-          navigator.geolocation.getCurrentPosition(
-            async (position) => {
-              try {
-                const { latitude, longitude } = position.coords;
-                
-                // First try with OpenStreetMap (free and doesn't require API key)
-                const response = await fetch(
-                  `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`
-                );
-                
-                if (response.ok) {
-                  const data = await response.json();
-                  const city = 
-                    data.address.city || 
-                    data.address.town || 
-                    data.address.district || 
-                    data.address.suburb || 
-                    "Hyderabad";
-                  
-                  setCityLocation(city);
-                  
-                  const state = data.address.state;
-                  if (state?.toLowerCase().includes("telangana")) {
-                    setSelectedState("telangana");
-                  } else if (state?.toLowerCase().includes("andhra pradesh")) {
-                    setSelectedState("andhraPradesh");
-                  }
-                }
-              } catch (error) {
-                console.error("Error with reverse geocoding:", error);
-                // Keep default location (already set above)
-              }
-            },
-            (error) => {
-              console.error("Geolocation error:", error);
-              // Keep default location (already set above)
-            }
-          );
-        }
-      } finally {
-        // Always set loading to false, whether we got location or not
-        setIsLoading(false);
-      }
-    };
-
-    detectUserLocation();
+    // Set default location to Hyderabad and loading to false immediately
+    setCityLocation("Hyderabad");
+    setSelectedState("telangana");
+    setIsLoading(false);
+    
+    // Skip geolocation for now to prevent infinite loops
+    // We'll use a fixed location instead
   }, []);
 
   // Function to handle district selection without changing the navbar display

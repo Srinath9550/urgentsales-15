@@ -889,6 +889,13 @@ export function MegaMenu({ isMobile = false }: MegaMenuProps) {
                     <IndianRupee className="h-3 w-3 mr-1.5" />
                     Above ₹3 Crore
                   </Link>
+                  <Link
+                    to="/buyer-pricing"
+                    className="flex items-center py-1 text-xs text-gray-600 hover:text-primary"
+                  >
+                    <Megaphone className="h-3 w-3 mr-1.5" />
+                    Ad Packages
+                  </Link>
                 </div>
               </div>
             </div>
@@ -1656,6 +1663,15 @@ export function MegaMenu({ isMobile = false }: MegaMenuProps) {
                     >
                       <IndianRupee className="h-4 w-4 mr-2 text-gray-500" />
                       Above ₹3 Crore
+                    </Link>
+                  </NavigationMenuLink>
+                  <NavigationMenuLink asChild>
+                    <Link
+                      to="/buyer-pricing"
+                      className="flex items-center text-sm hover:text-primary py-1.5"
+                    >
+                      <Megaphone className="h-4 w-4 mr-2 text-gray-500" />
+                      Ad Packages
                     </Link>
                   </NavigationMenuLink>
                 </div>

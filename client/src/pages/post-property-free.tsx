@@ -622,6 +622,21 @@ export default function PostPropertyFree() {
     }
   }, [currentStep]);
 
+  // Check for stored verification status on component mount
+  useEffect(() => {
+    try {
+      const email = form.getValues().contactEmail;
+      if (email) {
+        const storedVerification = localStorage.getItem(`email_verified_${email}`);
+        if (storedVerification === 'true') {
+          console.log("Found stored verification for email:", email);
+          setOtpVerified(true);
+        }
+      }
+    } catch (error) {
+      console.error("Error checking stored verification:", error);
+    }
+  }, []);
 
   // Clean up object URLs when component unmounts
   useEffect(() => {
@@ -821,6 +836,18 @@ export default function PostPropertyFree() {
         console.log("OTP VERIFICATION SUCCESSFUL!");
         console.log("========================================");
         
+        // Set the verified state immediately to prevent multiple verifications
+        setOtpVerified(true);
+        
+        // Store verification status in localStorage to persist across page refreshes
+        try {
+          const email = form.getValues().contactEmail || '';
+          localStorage.setItem(`email_verified_${email}`, 'true');
+          console.log("Verification status saved to localStorage for email:", email);
+        } catch (error) {
+          console.error("Error saving verification status to localStorage:", error);
+        }
+        
         toast({
           title: "Verification Successful",
           description: "Your email has been verified successfully.",
@@ -882,6 +909,15 @@ export default function PostPropertyFree() {
         setOtpVerified(true);
         setShowOtpModal(false);
         
+        // Store verification in localStorage for dev mode
+        try {
+          const email = form.getValues().contactEmail || '';
+          localStorage.setItem(`email_verified_${email}`, 'true');
+          console.log("Dev mode verification status saved to localStorage for email:", email);
+        } catch (error) {
+          console.error("Error saving dev verification status to localStorage:", error);
+        }
+        
         toast({
           title: "Verification Successful (Dev Mode)",
           description: "Test OTP accepted. Submitting your property...",
@@ -893,13 +929,32 @@ export default function PostPropertyFree() {
         // Use setTimeout to ensure state updates have completed
         setTimeout(() => {
           console.log("Submitting form after delay");
-          // Get the current form values
-          const formValues = form.getValues();
-          console.log("Current form values:", formValues);
-          
-          // Manually call onSubmit with the form values
-          onSubmit(formValues, new Event('submit') as React.FormEvent);
-        }, 500);
+          try {
+            // Try to restore form data from session storage if available
+            const storedData = sessionStorage.getItem('propertyFormData');
+            if (storedData) {
+              const parsedData = JSON.parse(storedData);
+              console.log("Restored form data from session storage:", parsedData);
+              
+              // Manually call onSubmit with the stored form values
+              onSubmit(parsedData, new Event('submit') as React.FormEvent);
+            } else {
+              // Get the current form values
+              const formValues = form.getValues();
+              console.log("Current form values:", formValues);
+              
+              // Manually call onSubmit with the form values
+              onSubmit(formValues, new Event('submit') as React.FormEvent);
+            }
+          } catch (error) {
+            console.error("Error submitting form after OTP verification:", error);
+            toast({
+              title: "Submission Error",
+              description: "There was an error submitting your property. Please try again.",
+              variant: "destructive",
+            });
+          }
+        }, 800); // Increased delay to ensure state updates
         
         return;
       }
@@ -910,6 +965,15 @@ export default function PostPropertyFree() {
         console.log("OTP verified successfully");
         setOtpVerified(true);
         setShowOtpModal(false);
+        
+        // Store verification in localStorage
+        try {
+          const email = form.getValues().contactEmail || '';
+          localStorage.setItem(`email_verified_${email}`, 'true');
+          console.log("Verification status saved to localStorage for email:", email);
+        } catch (error) {
+          console.error("Error saving verification status to localStorage:", error);
+        }
         
         toast({
           title: "Verification Successful",
@@ -922,13 +986,32 @@ export default function PostPropertyFree() {
         // Use setTimeout to ensure state updates have completed
         setTimeout(() => {
           console.log("Submitting form after delay");
-          // Get the current form values
-          const formValues = form.getValues();
-          console.log("Current form values:", formValues);
-          
-          // Manually call onSubmit with the form values
-          onSubmit(formValues, new Event('submit') as React.FormEvent);
-        }, 500);
+          try {
+            // Try to restore form data from session storage if available
+            const storedData = sessionStorage.getItem('propertyFormData');
+            if (storedData) {
+              const parsedData = JSON.parse(storedData);
+              console.log("Restored form data from session storage:", parsedData);
+              
+              // Manually call onSubmit with the stored form values
+              onSubmit(parsedData, new Event('submit') as React.FormEvent);
+            } else {
+              // Get the current form values
+              const formValues = form.getValues();
+              console.log("Current form values:", formValues);
+              
+              // Manually call onSubmit with the form values
+              onSubmit(formValues, new Event('submit') as React.FormEvent);
+            }
+          } catch (error) {
+            console.error("Error submitting form after OTP verification:", error);
+            toast({
+              title: "Submission Error",
+              description: "There was an error submitting your property. Please try again.",
+              variant: "destructive",
+            });
+          }
+        }, 800); // Increased delay to ensure state updates
       } else {
         setIsLoading(false);
         
@@ -1187,23 +1270,68 @@ export default function PostPropertyFree() {
   ) => {
     setUploadErrors(prev => ({...prev, [category]: ''}));
     
+    // Check if any files have unsupported formats
+    const supportedImageTypes = ["image/jpeg", "image/png", "image/jpg", "image/webp"];
+    const unsupportedFiles = files.filter(file => 
+      !supportedImageTypes.includes(file.file.type)
+    );
+    
+    if (unsupportedFiles.length > 0) {
+      // Create a warning message for unsupported files
+      const fileNames = unsupportedFiles.map(f => f.file.name).join(', ');
+      toast({
+        title: "Unsupported File Format",
+        description: `Some files have unsupported formats: ${fileNames}. Only JPG, PNG, and WebP are supported.`,
+        variant: "destructive",
+      });
+      
+      // Filter out unsupported files
+      files = files.filter(file => supportedImageTypes.includes(file.file.type));
+      
+      if (files.length === 0) {
+        setUploadErrors(prev => ({
+          ...prev, 
+          [category]: 'No supported files were found. Please upload JPG, PNG, or WebP images.'
+        }));
+        return;
+      }
+    }
+    
     // Ensure each file has the required properties
     const currentFiles = files.map(file => {
       // Make sure we have all required properties of FileWithPreview
-      console.log("Uploaded file server URLs:", file.serverUrl);
+      console.log("Processing file:", file.file.name, "Type:", file.file.type);
+      
+      // Create a proper preview URL if it doesn't exist
+      let preview = file.preview;
+      if (!preview && file.file) {
+        try {
+          preview = URL.createObjectURL(file.file);
+        } catch (error) {
+          console.error("Error creating preview URL:", error);
+        }
+      }
+      
       return {
         file: file.file,
-        id: file.id,
-        preview: file.preview,
+        id: file.id || crypto.randomUUID(),
+        preview: preview,
         serverUrl: file.serverUrl, // Include serverUrl if it exists
-        status: file.status || 'success',
+        status: file.status || 'uploading',
         name: file.file.name, // Set name from file
         size: file.file.size, // Set size from file
         type: file.file.type, // Set type from file
+        uploadProgress: file.uploadProgress || 0
       };
     });
     
-    setter(currentFiles);
+    // Update the state with the new files
+    setter(prevFiles => {
+      // Combine with existing files, avoiding duplicates by ID
+      const existingFileIds = new Set(prevFiles.map(f => f.id));
+      const newFiles = currentFiles.filter(f => !existingFileIds.has(f.id));
+      return [...prevFiles, ...newFiles];
+    });
 
     // Log the files for debugging
     console.log(`${category} files:`, currentFiles);
@@ -1268,6 +1396,7 @@ export default function PostPropertyFree() {
   const onSubmit = async (data: PropertyFormValues, event: React.FormEvent) => {
     event.preventDefault(); // Prevent default form submission behavior
     console.log("Form submission started with data:", data);
+    console.log("OTP verification status:", otpVerified ? "Verified" : "Not Verified");
     
     // Log the form data for debugging
     console.log("Form data to be submitted:", JSON.stringify(data, null, 2));
@@ -1282,28 +1411,58 @@ export default function PostPropertyFree() {
       return;
     }
 
+    // Check if we have a stored verification state in localStorage
+    try {
+      const storedVerification = localStorage.getItem(`email_verified_${data.contactEmail}`);
+      if (storedVerification === 'true' && !otpVerified) {
+        console.log("Found stored verification for email:", data.contactEmail);
+        setOtpVerified(true);
+      }
+    } catch (error) {
+      console.error("Error checking stored verification:", error);
+    }
+
     // If OTP is not verified, send OTP and show verification modal
     if (!otpVerified) {
       console.log("OTP not verified yet, sending OTP to:", data.contactEmail);
+      
+      // Store the form data in session storage to preserve it
+      try {
+        sessionStorage.setItem('propertyFormData', JSON.stringify(data));
+        console.log("Form data saved to session storage");
+      } catch (error) {
+        console.error("Error saving form data to session storage:", error);
+      }
+      
       toast({
         title: "Verification Required",
         description: "We need to verify your email before submitting",
         variant: "default",
       });
 
-      setIsLoading(true); // Show loading state while sending OTP
-      const otpSent = await sendOtp(data.contactEmail);
-      setIsLoading(false);
+      // Check if we already have an OTP modal open
+      if (!showOtpModal) {
+        setIsLoading(true); // Show loading state while sending OTP
+        const otpSent = await sendOtp(data.contactEmail);
+        setIsLoading(false);
 
-      if (otpSent) {
-        console.log("OTP sent successfully, showing OTP modal");
-        setShowOtpModal(true);
+        if (otpSent) {
+          console.log("OTP sent successfully, showing OTP modal");
+          setShowOtpModal(true);
+        } else {
+          console.error("Failed to send OTP");
+          toast({
+            title: "Error",
+            description: "Failed to send verification code. Please try again.",
+            variant: "destructive",
+          });
+        }
       } else {
-        console.error("Failed to send OTP");
+        // OTP modal is already open, just remind the user
         toast({
-          title: "Error",
-          description: "Failed to send verification code. Please try again.",
-          variant: "destructive",
+          title: "Verification Pending",
+          description: "Please enter the verification code sent to your email",
+          variant: "default",
         });
       }
       return;
@@ -1357,14 +1516,70 @@ export default function PostPropertyFree() {
   };
 
   const renderImage = (file: FileWithPreview) => {
-    return (
-      <img
-        key={file.id}
-        src={file.serverUrl || file.preview}
-        alt={file.name}
-        className="w-full h-full object-cover"
-      />
-    );
+    // Check if the file has a valid preview or serverUrl
+    if (!file.preview && !file.serverUrl) {
+      // Fallback for files without preview
+      return (
+        <div className="w-full h-full flex items-center justify-center bg-gray-100">
+          <ImageIcon className="h-8 w-8 text-gray-400" />
+          <p className="text-xs text-gray-500 mt-1">No preview</p>
+        </div>
+      );
+    }
+    
+    // Check if the file type is supported for preview
+    const supportedImageTypes = ["image/jpeg", "image/png", "image/jpg", "image/webp"];
+    if (!supportedImageTypes.includes(file.type || '')) {
+      return (
+        <div className="w-full h-full flex flex-col items-center justify-center bg-gray-100">
+          <ImageIcon className="h-8 w-8 text-gray-400" />
+          <p className="text-xs text-gray-500 mt-1">Unsupported format</p>
+        </div>
+      );
+    }
+    
+    // For supported image types with valid preview
+    try {
+      return (
+        <img
+          key={file.id}
+          src={file.serverUrl || file.preview}
+          alt={file.name || 'Property image'}
+          className="w-full h-full object-cover"
+          onError={(e) => {
+            // Handle image loading errors
+            const target = e.target as HTMLImageElement;
+            target.onerror = null; // Prevent infinite error loop
+            target.src = ''; // Clear the src
+            target.alt = 'Image failed to load';
+            target.style.display = 'none';
+            
+            // Add a fallback element
+            const parent = target.parentElement;
+            if (parent) {
+              const fallback = document.createElement('div');
+              fallback.className = 'w-full h-full flex flex-col items-center justify-center bg-gray-100';
+              fallback.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-8 w-8 text-gray-400">
+                  <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"></path>
+                  <circle cx="12" cy="13" r="3"></circle>
+                </svg>
+                <p class="text-xs text-gray-500 mt-1">Failed to load</p>
+              `;
+              parent.appendChild(fallback);
+            }
+          }}
+        />
+      );
+    } catch (error) {
+      console.error("Error rendering image:", error);
+      return (
+        <div className="w-full h-full flex flex-col items-center justify-center bg-gray-100">
+          <AlertTriangle className="h-8 w-8 text-amber-500" />
+          <p className="text-xs text-gray-500 mt-1">Error loading image</p>
+        </div>
+      );
+    }
   };
 
   const renderFormStep = () => {

@@ -1,6 +1,7 @@
 import { Router, Request, Response } from "express";
 import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import dotenv from 'dotenv';
 
 const router = Router();
 
@@ -8,8 +9,8 @@ const router = Router();
 const s3Client = new S3Client({
   region: process.env.AWS_BUCKET_REGION || 'ap-south-1',
   credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY || '',
-    secretAccessKey: process.env.AWS_SECRET_KEY || ''
+    accessKeyId: process.env.AWS_ACCESS_KEY!,
+    secretAccessKey: process.env.AWS_SECRET_KEY!
   }
 });
 
@@ -52,6 +53,16 @@ function extractS3Key(keyParam: string): string {
       }
     } catch (error) {
       console.error("Error extracting key from query string:", error);
+    }
+  }
+  
+  // Handle special case for properties folder
+  if (extractedKey.includes('properties/') && !extractedKey.startsWith('properties/')) {
+    // Extract the properties part
+    const parts = extractedKey.split('properties/');
+    if (parts.length > 1) {
+      extractedKey = `properties/${parts[1]}`;
+      console.log(`Extracted properties path: ${extractedKey}`);
     }
   }
   
@@ -122,16 +133,31 @@ router.get("/s3-signed-url", async (req: Request, res: Response) => {
   }
 });
 
+// Project placeholder SVG for pending uploads
+const projectPlaceholderSvg = `
+<svg width="200" height="200" xmlns="http://www.w3.org/2000/svg">
+  <rect width="200" height="200" fill="#f0f9ff"/>
+  <text x="50%" y="50%" font-family="Arial, sans-serif" font-size="20" text-anchor="middle" dominant-baseline="middle" fill="#666666">Project Image</text>
+</svg>
+`;
+
 // Endpoint to redirect to a signed URL for an S3 image
 router.get("/s3-image", async (req: Request, res: Response) => {
   try {
     const keyParam = req.query.key as string;
+    const isProject = req.query.type === 'project';
     
     console.log(`S3 image request for key: ${keyParam}`);
     
     if (!keyParam) {
       console.log("Missing key parameter in s3-image request");
-      return res.type('image/svg+xml').send(placeholderSvg);
+      return res.type('image/svg+xml').send(isProject ? projectPlaceholderSvg : placeholderSvg);
+    }
+    
+    // Special case for "pending-upload" placeholder
+    if (keyParam === 'pending-upload' || keyParam.includes('blob:')) {
+      console.log("Handling pending-upload or blob URL placeholder");
+      return res.type('image/svg+xml').send(isProject ? projectPlaceholderSvg : placeholderSvg);
     }
     
     // Check if the key is already a full URL (might be a redirect loop)
@@ -146,7 +172,13 @@ router.get("/s3-image", async (req: Request, res: Response) => {
     
     if (!s3Key) {
       console.log("Invalid key parameter in s3-image request");
-      return res.type('image/svg+xml').send(placeholderSvg);
+      return res.type('image/svg+xml').send(isProject ? projectPlaceholderSvg : placeholderSvg);
+    }
+    
+    // Special case for "pending-upload" placeholder (after extraction)
+    if (s3Key === 'pending-upload') {
+      console.log("Handling pending-upload placeholder (after extraction)");
+      return res.type('image/svg+xml').send(isProject ? projectPlaceholderSvg : placeholderSvg);
     }
     
     // Check if the extracted key is already a full URL
@@ -158,7 +190,7 @@ router.get("/s3-image", async (req: Request, res: Response) => {
     // Check if the key still contains our API endpoint (recursive loop)
     if (s3Key.includes('/api/s3-image')) {
       console.log("Detected potential recursive loop in S3 key");
-      return res.type('image/svg+xml').send(placeholderSvg);
+      return res.type('image/svg+xml').send(isProject ? projectPlaceholderSvg : placeholderSvg);
     }
     
     // Check if we have a cached URL that's still valid
@@ -168,29 +200,86 @@ router.get("/s3-image", async (req: Request, res: Response) => {
       return res.redirect(cached.url);
     }
     
+    // Special handling for properties folder
+    if (s3Key.includes('properties/')) {
+      console.log(`Detected properties folder image: ${s3Key}`);
+      
+      try {
+        // First try to generate a signed URL
+        console.log(`Generating signed URL for properties key: ${s3Key}`);
+        console.log(`Using bucket: ${process.env.AWS_BUCKET_NAME || 'property-images-urgent-sales'}`);
+        
+        const command = new GetObjectCommand({
+          Bucket: process.env.AWS_BUCKET_NAME || 'property-images-urgent-sales',
+          Key: s3Key
+        });
+        
+        const signedUrl = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
+        console.log(`Generated signed URL for properties: ${signedUrl.substring(0, 100)}...`);
+        
+        // Cache the URL with a 50-minute expiry (URLs are valid for 1 hour)
+        signedUrlCache[s3Key] = {
+          url: signedUrl,
+          expiry: Date.now() + 50 * 60 * 1000 // 50 minutes in milliseconds
+        };
+        
+        // Redirect to the signed URL
+        return res.redirect(signedUrl);
+      } catch (error) {
+        console.error(`Error generating signed URL for properties image ${s3Key}:`, error);
+        
+        // Try direct S3 URL as fallback
+        const bucketName = process.env.AWS_BUCKET_NAME || 'property-images-urgent-sales';
+        const region = process.env.AWS_BUCKET_REGION || 'ap-south-1';
+        const directS3Url = `https://${bucketName}.s3.${region}.amazonaws.com/${s3Key}`;
+        
+        console.log(`Falling back to direct S3 URL: ${directS3Url}`);
+        return res.redirect(directS3Url);
+      }
+    }
+    
     console.log(`Generating signed URL for key: ${s3Key}`);
     console.log(`Using bucket: ${process.env.AWS_BUCKET_NAME || 'property-images-urgent-sales'}`);
     
-    // Generate a signed URL
-    const command = new GetObjectCommand({
-      Bucket: process.env.AWS_BUCKET_NAME || 'property-images-urgent-sales',
-      Key: s3Key
-    });
-    
-    const signedUrl = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
-    console.log(`Generated signed URL: ${signedUrl.substring(0, 100)}...`);
-    
-    // Cache the URL with a 50-minute expiry (URLs are valid for 1 hour)
-    signedUrlCache[s3Key] = {
-      url: signedUrl,
-      expiry: Date.now() + 50 * 60 * 1000 // 50 minutes in milliseconds
-    };
-    
-    // Redirect to the signed URL
-    return res.redirect(signedUrl);
+    try {
+      // Generate a signed URL
+      const command = new GetObjectCommand({
+        Bucket: process.env.AWS_BUCKET_NAME || 'property-images-urgent-sales',
+        Key: s3Key
+      });
+      
+      const signedUrl = await getSignedUrl(s3Client, command, { expiresIn: 3600 });
+      console.log(`Generated signed URL: ${signedUrl.substring(0, 100)}...`);
+      
+      // Cache the URL with a 50-minute expiry (URLs are valid for 1 hour)
+      signedUrlCache[s3Key] = {
+        url: signedUrl,
+        expiry: Date.now() + 50 * 60 * 1000 // 50 minutes in milliseconds
+      };
+      
+      // Redirect to the signed URL
+      return res.redirect(signedUrl);
+    } catch (error) {
+      console.error(`Error generating signed URL for image ${s3Key}:`, error);
+      
+      // Try direct S3 URL as fallback
+      const bucketName = process.env.AWS_BUCKET_NAME || 'property-images-urgent-sales';
+      const region = process.env.AWS_BUCKET_REGION || 'ap-south-1';
+      const directS3Url = `https://${bucketName}.s3.${region}.amazonaws.com/${s3Key}`;
+      
+      console.log(`Falling back to direct S3 URL: ${directS3Url}`);
+      
+      try {
+        return res.redirect(directS3Url);
+      } catch (redirectError) {
+        console.error("Error redirecting to direct S3 URL:", redirectError);
+        return res.type('image/svg+xml').send(isProject ? projectPlaceholderSvg : placeholderSvg);
+      }
+    }
   } catch (error) {
     console.error("Error generating signed URL for image:", error);
-    return res.type('image/svg+xml').send(placeholderSvg);
+    const isProject = req.query.type === 'project';
+    return res.type('image/svg+xml').send(isProject ? projectPlaceholderSvg : placeholderSvg);
   }
 });
 

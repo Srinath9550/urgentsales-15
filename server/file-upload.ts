@@ -181,6 +181,18 @@ export function getFileUrl(filename: string, userId: number | string): string {
 
   console.log(`Getting URL for file: ${filename}, userId: ${userId}`);
   
+  // Special case for "pending-upload" placeholder
+  if (filename === 'pending-upload') {
+    console.log('Handling pending-upload placeholder');
+    return 'pending-upload';
+  }
+  
+  // Special case for blob URLs (client-side only, should be replaced before saving)
+  if (filename.startsWith('blob:')) {
+    console.log('Detected blob URL, returning pending-upload placeholder');
+    return 'pending-upload';
+  }
+  
   // CASE 1: If it's already a full URL, return it as is
   if (filename.startsWith('http://') || filename.startsWith('https://')) {
     console.log(`Using existing full URL: ${filename}`);

@@ -36,6 +36,7 @@ import {
 } from "./email-service";
 import propertyInterestRoutes from "./routes/property-interest";
 import s3ImageRoutes from "./routes/s3-image-routes";
+import emailTestRoutes from "./routes/email-test";
 import {
   getRecentLogs,
   getEntityLogs,
@@ -4567,6 +4568,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Property interest endpoint
   app.post("/api/property-interest", asyncHandler(handlePropertyInterest));
+  
+  // Email test route
+  app.use("/api/email-test", emailTestRoutes);
 
   // =========== Referral System Routes ===========
   

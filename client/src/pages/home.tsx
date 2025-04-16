@@ -23,7 +23,13 @@ function PropertyOwnerCTA() {
 // New Projects Banner Component
 function NewProjectsBanner() {
   // Use images from the first few properties in the database
-  const projectImage = "/api/s3-image?key=properties/1744614622969-952470017.jpg";
+  const projectImages = [
+    "properties/1744614622969-952470017.jpg",
+    "properties/1744614645930-476073492.jpg",
+    "properties/1744614645942-229037486.jpg",
+    "properties/1744696075227-385132684.jpeg",
+    "properties/1744698986428-974199278.jpg"
+  ];
   
   return (
     <section className="bg-white rounded-lg shadow-md overflow-hidden">
@@ -34,25 +40,20 @@ function NewProjectsBanner() {
         <div className="md:col-span-1">
           <h3 className="text-2xl font-bold mb-4">New Projects</h3>
           <img 
-            src={projectImage} 
+            src={formatImageUrl(projectImages[0], true)} 
             alt="Projects" 
             className="w-full h-auto rounded-md"
-            onError={(e) => handleImageError(e)}
+            onError={(e) => handleImageError(e, undefined, true)}
           />
         </div>
         <div className="md:col-span-2 grid grid-cols-2 gap-4">
-          {[
-            "/api/s3-image?key=properties/1744614645930-476073492.jpg",
-            "/api/s3-image?key=properties/1744614645942-229037486.jpg",
-            "/api/s3-image?key=properties/1744696075227-385132684.jpeg",
-            "/api/s3-image?key=properties/1744698986428-974199278.jpg"
-          ].map((imgSrc, index) => (
+          {projectImages.slice(1).map((imgSrc, index) => (
             <div key={index} className="relative overflow-hidden rounded-md">
               <img 
-                src={imgSrc} 
+                src={formatImageUrl(imgSrc, true)} 
                 alt={`Project ${index + 1}`} 
                 className="w-full h-40 object-cover transition-transform hover:scale-105"
-                onError={(e) => handleImageError(e)}
+                onError={(e) => handleImageError(e, undefined, true)}
               />
             </div>
           ))}

@@ -3,6 +3,7 @@ import { Building2, ChevronRight, Image, PlusCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useLocation } from "wouter";
+import { formatImageUrl, handleImageError } from "@/lib/image-utils";
 
 export default function NewProjectsBanner() {
   const [, navigate] = useLocation();
@@ -68,7 +69,13 @@ export default function NewProjectsBanner() {
             <div
               className="w-full sm:w-48 h-auto sm:h-48 py-4 bg-amber-50 rounded-lg shadow-md border border-amber-100 hover:border-amber-300 transition-all hover:shadow-lg cursor-pointer flex flex-col items-center justify-center p-4 text-center"
               onClick={() => {
-                navigate("/submit-project");
+                // Check if user is logged in
+                const isLoggedIn = localStorage.getItem('token'); // Assuming token is stored in localStorage
+                if (!isLoggedIn) {
+                  navigate("/auth"); // Redirect to auth page if not logged in
+                } else {
+                  navigate("/submit-project"); // Redirect to submit project if logged in
+                }
                 window.scrollTo(0, 0);
               }}
             >

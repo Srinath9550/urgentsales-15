@@ -83,7 +83,7 @@ export default function Feedback() {
         description:
           "Thank you for your feedback! We'll review it and respond to " +
           data.email +
-          " if needed. A copy has been sent to urgentsales.in@gmail.com",
+          " if needed. A copy has been sent to urgentsale.in@gmail.com",
       });
 
       form.reset();

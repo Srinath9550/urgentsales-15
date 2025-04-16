@@ -19,25 +19,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { formatImageUrl, handleImageError } from "@/lib/image-utils";
 
-interface AffordableProject {
-  id: string;
-  title: string;
-  location: string;
-  city: string;
-  state?: string;
-  price: string;
-  bhkConfig: string;
-  imageUrl: string;
-  builder: string;
-  priceRange?: string;
-  amenities?: string[];
-  launchDate?: string;
-  possessionDate?: string;
-  featured?: boolean;
-  tags?: string[];
-  contactNumber?: string;
-  description?: string;
-}
+import { AffordableProject } from "@/types/property-types";
 
 export default function AffordableProjects() {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -408,10 +390,15 @@ function ProjectCard({ project }: ProjectCardProps) {
       >
         <div className="relative">
           <img
-            src={formatImageUrl(project.imageUrl)}
+            src={formatImageUrl(
+              project.imageUrls && project.imageUrls.length > 0 
+                ? project.imageUrls[0] 
+                : project.imageUrl || '', 
+              true
+            )}
             alt={project.title}
             className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
-            onError={(e) => handleImageError(e)}
+            onError={(e) => handleImageError(e, undefined, true)}
           />
           {project.featured && (
             <div className="absolute top-2 left-2 bg-yellow-500 text-white text-xs px-2 py-1 rounded-md">

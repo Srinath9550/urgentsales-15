@@ -7,12 +7,174 @@ import { sendEmail } from "./email-service";
 import { logActivity, logProjectSubmission } from "./logger-service";
 import { sendWhatsAppNotification } from "./auth";
 
+// Helper function to process image URLs for projects
+// Helper function to convert snake_case to camelCase
+function convertSnakeToCamel(obj: any) {
+  if (!obj || typeof obj !== 'object') return obj;
+  
+  // Handle arrays
+  if (Array.isArray(obj)) {
+    return obj.map(item => convertSnakeToCamel(item));
+  }
+  
+  // Create a new object with camelCase keys
+  const newObj: any = {};
+  
+  for (const key in obj) {
+    if (Object.prototype.hasOwnProperty.call(obj, key)) {
+      // Convert key from snake_case to camelCase
+      const camelKey = key.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+      
+      // Recursively convert nested objects
+      newObj[camelKey] = convertSnakeToCamel(obj[key]);
+      
+      // Also keep the original key for backward compatibility
+      if (camelKey !== key) {
+        newObj[key] = obj[key];
+      }
+    }
+  }
+  
+  return newObj;
+}
+
+async function processProjectImageUrls(projects: any[], fullProcess = false) {
+  if (!projects || projects.length === 0) return projects;
+  
+  const { getSignedImageUrl } = await import('./s3-service');
+  
+  // Convert all projects from snake_case to camelCase
+  projects = projects.map(project => convertSnakeToCamel(project));
+  
+  for (const project of projects) {
+    // Ensure imageUrls exists (for backward compatibility)
+    if (project.image_urls && !project.imageUrls) {
+      project.imageUrls = project.image_urls;
+    }
+    
+    // Process main image URLs
+    if (project.imageUrls && Array.isArray(project.imageUrls)) {
+      if (fullProcess) {
+        // Process all images for detailed views
+        const processedUrls = await Promise.all(
+          project.imageUrls.map(async (url: string) => {
+            if (!url || url === 'pending-upload') return '';
+            if (url.startsWith('http')) return url;
+            
+            try {
+              const signedUrl = await getSignedImageUrl(url);
+              return signedUrl || url;
+            } catch (error) {
+              console.error(`Error generating signed URL for ${url}:`, error);
+              return url;
+            }
+          })
+        );
+        project.imageUrls = processedUrls.filter(Boolean);
+      } else {
+        // Process only the first image for listing views (performance optimization)
+        if (project.imageUrls.length > 0) {
+          const url = project.imageUrls[0];
+          if (url && url !== 'pending-upload' && !url.startsWith('http')) {
+            try {
+              const signedUrl = await getSignedImageUrl(url);
+              if (signedUrl) {
+                project.imageUrls[0] = signedUrl;
+              }
+            } catch (error) {
+              console.error(`Error generating signed URL for ${url}:`, error);
+            }
+          }
+        }
+      }
+    }
+    
+    // Convert snake_case to camelCase for gallery URLs
+    if (project.gallery_urls && !project.galleryUrls) {
+      project.galleryUrls = project.gallery_urls;
+    }
+    
+    // Process gallery URLs for all projects, not just full processing
+    if (project.galleryUrls && Array.isArray(project.galleryUrls)) {
+      const processedGalleryUrls = await Promise.all(
+        project.galleryUrls.map(async (url: string) => {
+          if (!url || url === 'pending-upload' || (typeof url === 'string' && url.startsWith('blob:'))) return '';
+          if (url.startsWith('http')) return url;
+          
+          try {
+            const signedUrl = await getSignedImageUrl(url);
+            return signedUrl || url;
+          } catch (error) {
+            console.error(`Error generating signed URL for gallery image ${url}:`, error);
+            return url;
+          }
+        })
+      );
+      project.galleryUrls = processedGalleryUrls.filter(Boolean);
+    }
+    
+    // Ensure gallery_urls is also updated for backward compatibility
+    if (project.galleryUrls && !project.gallery_urls) {
+      project.gallery_urls = project.galleryUrls;
+    }
+  }
+  
+  return projects;
+}
+
 // Get upcoming projects
 export async function getUpcomingProjects(req: Request, res: Response) {
   const client = await pool.connect();
   try {
-    const result = await client.query('SELECT * FROM projects WHERE status = $1', ['upcoming']);
-    return res.status(200).json(result.rows);
+    // Check if category parameter is provided
+    const category = req.query.category as string;
+    
+    // Build the query based on parameters
+    let query = 'SELECT * FROM projects WHERE status = $1';
+    const queryParams = ['upcoming'];
+    
+    // If category is specified, add it to the query
+    if (category) {
+      query += ' AND category = $2';
+      queryParams.push(category);
+    }
+    
+    // Add approval status filter to only show approved projects
+    query += ' AND approval_status = $' + (queryParams.length + 1);
+    queryParams.push('approved');
+    
+    // Execute the query
+    const result = await client.query(query, queryParams);
+    
+    // Log raw data for debugging
+    console.log('Upcoming projects raw data:', result.rows.map(p => ({
+      id: p.id,
+      title: p.title,
+      category: p.category,
+      status: p.status,
+      hasImageUrls: p.image_urls && p.image_urls.length > 0,
+      imageUrlsLength: p.image_urls ? p.image_urls.length : 0,
+      firstImageUrl: p.image_urls && p.image_urls.length > 0 ? p.image_urls[0] : null,
+    })));
+    
+    // Convert snake_case to camelCase first
+    const camelCaseProjects = result.rows.map(project => convertSnakeToCamel(project));
+    
+    // Process image URLs (only first image for listing views)
+    await processProjectImageUrls(camelCaseProjects, false);
+    
+    // Log processed data for debugging
+    console.log('Upcoming projects processed data:', camelCaseProjects.map(p => ({
+      id: p.id,
+      title: p.title,
+      category: p.category,
+      status: p.status,
+      hasImageUrls: p.imageUrls && p.imageUrls.length > 0,
+      imageUrlsLength: p.imageUrls ? p.imageUrls.length : 0,
+      firstImageUrl: p.imageUrls && p.imageUrls.length > 0 ? p.imageUrls[0] : null,
+    })));
+    
+    return res.status(200).json(camelCaseProjects);
   } catch (err) {
     console.error('Database error:', err);
     return res.status(500).json({ error: 'Failed to fetch upcoming projects' });
@@ -35,6 +197,9 @@ export async function getFeaturedProjects(req: Request, res: Response) {
       )
       .orderBy(desc(projects.createdAt))
       .limit(limit);
+      
+    // Process image URLs (only first image for listing views)
+    await processProjectImageUrls(featuredProjects, false);
 
     return res.status(200).json(featuredProjects);
   } catch (error) {
@@ -61,6 +226,9 @@ export async function getLuxuryProjects(req: Request, res: Response) {
       return res.status(200).json([]);
     }
     
+    // Process image URLs (only first image for listing views)
+    await processProjectImageUrls(luxuryProjects, false);
+    
     return res.status(200).json(luxuryProjects);
   } catch (error) {
     console.error("Error fetching luxury projects:", error);
@@ -83,6 +251,11 @@ export async function getProjectById(req: Request, res: Response) {
     if (!project) {
       return res.status(404).json({ error: "Project not found" });
     }
+
+    // Process all image URLs with full processing (including gallery images)
+    console.log(`Processing image URLs for project ${id}`);
+    await processProjectImageUrls([project], true);
+    console.log(`Finished processing image URLs for project ${id}`);
 
     return res.status(200).json(project);
   } catch (error) {
@@ -109,6 +282,9 @@ export async function getAffordableProjects(req: Request, res: Response) {
       return res.status(200).json([]);
     }
     
+    // Process image URLs (only first image for listing views)
+    await processProjectImageUrls(affordableProjects, false);
+    
     return res.status(200).json(affordableProjects);
   } catch (error) {
     console.error("Error fetching affordable projects:", error);
@@ -133,6 +309,9 @@ export async function getCommercialProjects(req: Request, res: Response) {
     if (commercialProjects.length === 0) {
       return res.status(200).json([]);
     }
+    
+    // Process image URLs (only first image for listing views)
+    await processProjectImageUrls(commercialProjects, false);
     
     return res.status(200).json(commercialProjects);
   } catch (error) {
@@ -159,6 +338,9 @@ export async function getNewLaunchProjects(req: Request, res: Response) {
       return res.status(200).json([]);
     }
     
+    // Process image URLs (only first image for listing views)
+    await processProjectImageUrls(newLaunchProjects, false);
+    
     return res.status(200).json(newLaunchProjects);
   } catch (error) {
     console.error("Error fetching new launch projects:", error);
@@ -183,6 +365,9 @@ export async function getNewlyListedProjects(req: Request, res: Response) {
     if (newlyListedProjects.length === 0) {
       return res.status(200).json([]);
     }
+    
+    // Process image URLs (only first image for listing views)
+    await processProjectImageUrls(newlyListedProjects, false);
     
     return res.status(200).json(newlyListedProjects);
   } catch (error) {
@@ -209,6 +394,9 @@ export async function getTopUrgentProjects(req: Request, res: Response) {
       return res.status(200).json([]);
     }
     
+    // Process image URLs (only first image for listing views)
+    await processProjectImageUrls(topUrgentProjects, false);
+    
     return res.status(200).json(topUrgentProjects);
   } catch (error) {
     console.error("Error fetching top urgent projects:", error);
@@ -233,6 +421,9 @@ export async function getCompanyProjects(req: Request, res: Response) {
     if (companyProjects.length === 0) {
       return res.status(200).json([]);
     }
+    
+    // Process image URLs (only first image for listing views)
+    await processProjectImageUrls(companyProjects, false);
     
     return res.status(200).json(companyProjects);
   } catch (error) {
@@ -360,7 +551,8 @@ export async function submitProject(req: Request, res: Response) {
     // Handle file uploads if any
     let uploadedImageUrls: string[] = [];
     
-    // Import getFileUrl to generate correct URLs
+    // Import S3 upload function and getFileUrl to generate correct URLs
+    const { uploadToS3 } = await import('./s3-service');
     const { getFileUrl } = await import('./file-upload');
     const fileUserId = req.user?.id || 1; // Default to admin user if no authenticated user
     
@@ -368,10 +560,17 @@ export async function submitProject(req: Request, res: Response) {
     
     // Handle single file uploads (e.g., req.file from multer single)
     if (req.file) {
-      console.log("Processing single file upload:", req.file.filename);
-      const fileUrl = getFileUrl(req.file.filename, fileUserId);
-      uploadedImageUrls.push(fileUrl);
-      console.log("Generated URL for single file:", fileUrl);
+      console.log("Processing single file upload:", req.file.originalname);
+      try {
+        // Upload to S3 with projects folder
+        const s3Key = await uploadToS3(req.file, `projects/user-${fileUserId}`);
+        if (s3Key) {
+          uploadedImageUrls.push(s3Key);
+          console.log("Uploaded file to S3:", s3Key);
+        }
+      } catch (error) {
+        console.error("Error uploading single file to S3:", error);
+      }
     }
     
     // Handle multiple file uploads (e.g., req.files from multer array/fields)
@@ -383,39 +582,137 @@ export async function submitProject(req: Request, res: Response) {
       if (Array.isArray(req.files)) {
         // It's an array of files
         console.log(`Processing ${req.files.length} files in array`);
-        const fileUrls = (req.files as Express.Multer.File[]).map(file => {
-          console.log(`  - Array file: ${file.filename}`);
-          const fileUrl = getFileUrl(file.filename, fileUserId);
-          console.log(`    Generated URL: ${fileUrl}`);
-          return fileUrl;
-        });
-        uploadedImageUrls = uploadedImageUrls.concat(fileUrls);
+        
+        // Process each file in the array
+        for (const file of req.files as Express.Multer.File[]) {
+          try {
+            console.log(`  - Array file: ${file.originalname}`);
+            const s3Key = await uploadToS3(file, `projects/user-${fileUserId}`);
+            if (s3Key) {
+              uploadedImageUrls.push(s3Key);
+              console.log(`    Uploaded to S3: ${s3Key}`);
+            }
+          } catch (error) {
+            console.error(`Error uploading file ${file.originalname} to S3:`, error);
+          }
+        }
       } else {
         // It's an object with field names as keys
         const filesObj = req.files as { [fieldname: string]: Express.Multer.File[] };
         
         // Iterate through each field and add all files
-        Object.keys(filesObj).forEach(fieldname => {
+        for (const fieldname of Object.keys(filesObj)) {
           const fieldFiles = filesObj[fieldname];
           console.log(`Processing ${fieldFiles.length} files in field '${fieldname}'`);
           
           if (Array.isArray(fieldFiles)) {
-            fieldFiles.forEach(file => {
-              console.log(`  - Field file: ${file.filename} (${fieldname})`);
-              const fileUrl = getFileUrl(file.filename, fileUserId);
-              console.log(`    Generated URL: ${fileUrl}`);
-              uploadedImageUrls.push(fileUrl);
-              
-              // Special handling for heroImage
-              if (fieldname === 'heroImage') {
-                console.log("Setting heroImage as first in imageUrls array");
-                // Move hero image to the beginning of the array
-                uploadedImageUrls = uploadedImageUrls.filter(url => url !== fileUrl);
-                uploadedImageUrls.unshift(fileUrl);
+            for (const file of fieldFiles) {
+              try {
+                console.log(`  - Field file: ${file.originalname} (${fieldname})`);
+                const s3Key = await uploadToS3(file, `projects/user-${fileUserId}`);
+                
+                if (s3Key) {
+                  uploadedImageUrls.push(s3Key);
+                  console.log(`    Uploaded to S3: ${s3Key}`);
+                  
+                  // Special handling for heroImage
+                  if (fieldname === 'heroImage') {
+                    console.log("Setting heroImage as first in imageUrls array");
+                    // Move hero image to the beginning of the array
+                    uploadedImageUrls = uploadedImageUrls.filter(url => url !== s3Key);
+                    uploadedImageUrls.unshift(s3Key);
+                  }
+                  
+                  // Special handling for galleryImages
+                  if (fieldname === 'galleryImages') {
+                    console.log(`Adding gallery image to galleryUrls: ${s3Key}`);
+                    
+                    // Add to galleryUrls array if it exists
+                    if (!req.body.galleryUrls) {
+                      req.body.galleryUrls = [];
+                    } else if (typeof req.body.galleryUrls === 'string') {
+                      try {
+                        req.body.galleryUrls = JSON.parse(req.body.galleryUrls);
+                      } catch (e) {
+                        req.body.galleryUrls = [];
+                      }
+                    }
+                    
+                    // Ensure galleryUrls is an array
+                    if (!Array.isArray(req.body.galleryUrls)) {
+                      req.body.galleryUrls = [];
+                    }
+                    
+                    // Add the S3 key to galleryUrls
+                    req.body.galleryUrls.push(s3Key);
+                  }
+                  
+                  // Special handling for location map
+                  if (fieldname === 'locationMap') {
+                    console.log(`Setting locationMapUrl: ${s3Key}`);
+                    req.body.locationMapUrl = s3Key;
+                  }
+                  
+                  // Special handling for master plan
+                  if (fieldname === 'masterPlan') {
+                    console.log(`Setting masterPlanUrl: ${s3Key}`);
+                    req.body.masterPlanUrl = s3Key;
+                  }
+                  
+                  // Special handling for floor plans
+                  if (fieldname === 'floorPlans') {
+                    console.log(`Adding floor plan to floorPlanUrls: ${s3Key}`);
+                    
+                    // Add to floorPlanUrls array if it exists
+                    if (!req.body.floorPlanUrls) {
+                      req.body.floorPlanUrls = [];
+                    } else if (typeof req.body.floorPlanUrls === 'string') {
+                      try {
+                        req.body.floorPlanUrls = JSON.parse(req.body.floorPlanUrls);
+                      } catch (e) {
+                        req.body.floorPlanUrls = [];
+                      }
+                    }
+                    
+                    // Ensure floorPlanUrls is an array
+                    if (!Array.isArray(req.body.floorPlanUrls)) {
+                      req.body.floorPlanUrls = [];
+                    }
+                    
+                    // Add the S3 key to floorPlanUrls
+                    req.body.floorPlanUrls.push(s3Key);
+                  }
+                  
+                  // Special handling for specifications
+                  if (fieldname === 'specifications') {
+                    console.log(`Adding specification to specificationUrls: ${s3Key}`);
+                    
+                    // Add to specificationUrls array if it exists
+                    if (!req.body.specificationUrls) {
+                      req.body.specificationUrls = [];
+                    } else if (typeof req.body.specificationUrls === 'string') {
+                      try {
+                        req.body.specificationUrls = JSON.parse(req.body.specificationUrls);
+                      } catch (e) {
+                        req.body.specificationUrls = [];
+                      }
+                    }
+                    
+                    // Ensure specificationUrls is an array
+                    if (!Array.isArray(req.body.specificationUrls)) {
+                      req.body.specificationUrls = [];
+                    }
+                    
+                    // Add the S3 key to specificationUrls
+                    req.body.specificationUrls.push(s3Key);
+                  }
+                }
+              } catch (error) {
+                console.error(`Error uploading file ${file.originalname} to S3:`, error);
               }
-            });
+            }
           }
-        });
+        }
       }
     }
     
@@ -432,6 +729,202 @@ export async function submitProject(req: Request, res: Response) {
         req.body.imageUrls = [...req.body.imageUrls, ...uploadedImageUrls];
       } else {
         req.body.imageUrls = uploadedImageUrls;
+      }
+      
+      // Make sure galleryUrls is properly initialized
+      if (!req.body.galleryUrls) {
+        req.body.galleryUrls = [];
+      } else if (typeof req.body.galleryUrls === 'string') {
+        try {
+          req.body.galleryUrls = JSON.parse(req.body.galleryUrls);
+        } catch (e) {
+          console.error("Error parsing galleryUrls:", e);
+          req.body.galleryUrls = [];
+        }
+      }
+      
+      // Ensure galleryUrls is an array
+      if (!Array.isArray(req.body.galleryUrls)) {
+        req.body.galleryUrls = [];
+      }
+    }
+    
+    // Clean up imageUrls array - remove blob URLs and handle pending-upload
+    if (req.body.imageUrls && Array.isArray(req.body.imageUrls)) {
+      req.body.imageUrls = req.body.imageUrls.map((url: string) => {
+        // Handle blob URLs
+        if (typeof url === 'string' && url.startsWith('blob:')) {
+          console.log(`Converting blob URL to pending-upload placeholder: ${url}`);
+          return 'pending-upload';
+        }
+        return url;
+      });
+      
+      // If we have a heroImage in uploadedImageUrls, replace the first 'pending-upload' with it
+      if (uploadedImageUrls.length > 0 && req.body.imageUrls.includes('pending-upload')) {
+        console.log(`Replacing 'pending-upload' with actual S3 URL: ${uploadedImageUrls[0]}`);
+        const pendingIndex = req.body.imageUrls.indexOf('pending-upload');
+        if (pendingIndex !== -1) {
+          req.body.imageUrls[pendingIndex] = uploadedImageUrls[0];
+        } else {
+          // If no 'pending-upload' found, add the S3 URL to the beginning
+          req.body.imageUrls.unshift(uploadedImageUrls[0]);
+        }
+      }
+    } else if (uploadedImageUrls.length > 0) {
+      // If imageUrls doesn't exist but we have uploaded images, create it
+      console.log(`Creating imageUrls array with uploaded S3 URLs: ${uploadedImageUrls}`);
+      req.body.imageUrls = uploadedImageUrls;
+    }
+    
+    // Clean up galleryUrls array - remove blob URLs and handle pending-upload
+    if (req.body.galleryUrls) {
+      // Parse galleryUrls if it's a string
+      if (typeof req.body.galleryUrls === 'string') {
+        try {
+          req.body.galleryUrls = JSON.parse(req.body.galleryUrls);
+        } catch (e) {
+          console.error("Error parsing galleryUrls:", e);
+          req.body.galleryUrls = [];
+        }
+      }
+      
+      // Handle array of strings that might be JSON strings
+      if (Array.isArray(req.body.galleryUrls)) {
+        req.body.galleryUrls = req.body.galleryUrls.flatMap((item: any) => {
+          // If the item is a JSON string, parse it
+          if (typeof item === 'string' && (item.startsWith('[') || item.startsWith('{'))) {
+            try {
+              const parsed = JSON.parse(item);
+              if (Array.isArray(parsed)) {
+                return parsed;
+              }
+              return item;
+            } catch (e) {
+              return item;
+            }
+          }
+          return item;
+        });
+        
+        // Clean up blob URLs
+        req.body.galleryUrls = req.body.galleryUrls.map((url: string) => {
+          if (typeof url === 'string' && url.startsWith('blob:')) {
+            console.log(`Converting gallery blob URL to pending-upload placeholder: ${url}`);
+            return 'pending-upload';
+          }
+          return url;
+        });
+        
+        // Replace 'pending-upload' placeholders with actual S3 URLs for gallery images
+        // Skip the first uploaded image as it's likely the hero image
+        if (uploadedImageUrls.length > 1) {
+          const galleryS3Urls = uploadedImageUrls.slice(1); // Skip the first one (hero image)
+          console.log(`Found ${galleryS3Urls.length} gallery S3 URLs to replace placeholders`);
+          
+          let replacementIndex = 0;
+          req.body.galleryUrls = req.body.galleryUrls.map((url: string) => {
+            if (url === 'pending-upload' && replacementIndex < galleryS3Urls.length) {
+              console.log(`Replacing gallery 'pending-upload' with S3 URL: ${galleryS3Urls[replacementIndex]}`);
+              return galleryS3Urls[replacementIndex++];
+            }
+            return url;
+          });
+          
+          // Add any remaining S3 URLs that weren't used for replacement
+          if (replacementIndex < galleryS3Urls.length) {
+            const remainingUrls = galleryS3Urls.slice(replacementIndex);
+            console.log(`Adding ${remainingUrls.length} remaining S3 gallery URLs`);
+            req.body.galleryUrls = [...req.body.galleryUrls, ...remainingUrls];
+          }
+        }
+      }
+    } else if (uploadedImageUrls.length > 1) {
+      // If galleryUrls doesn't exist but we have uploaded images beyond the hero image
+      const galleryS3Urls = uploadedImageUrls.slice(1); // Skip the first one (hero image)
+      console.log(`Creating galleryUrls array with ${galleryS3Urls.length} S3 URLs`);
+      req.body.galleryUrls = galleryS3Urls;
+    }
+    
+    // Clean up floorPlanUrls array
+    if (req.body.floorPlanUrls) {
+      // Parse floorPlanUrls if it's a string
+      if (typeof req.body.floorPlanUrls === 'string') {
+        try {
+          req.body.floorPlanUrls = JSON.parse(req.body.floorPlanUrls);
+        } catch (e) {
+          console.error("Error parsing floorPlanUrls:", e);
+          req.body.floorPlanUrls = [];
+        }
+      }
+      
+      // Handle array of strings that might be JSON strings
+      if (Array.isArray(req.body.floorPlanUrls)) {
+        req.body.floorPlanUrls = req.body.floorPlanUrls.flatMap((item: any) => {
+          // If the item is a JSON string, parse it
+          if (typeof item === 'string' && (item.startsWith('[') || item.startsWith('{'))) {
+            try {
+              const parsed = JSON.parse(item);
+              if (Array.isArray(parsed)) {
+                return parsed;
+              }
+              return item;
+            } catch (e) {
+              return item;
+            }
+          }
+          return item;
+        });
+        
+        // Clean up blob URLs
+        req.body.floorPlanUrls = req.body.floorPlanUrls.map((url: string) => {
+          if (typeof url === 'string' && url.startsWith('blob:')) {
+            console.log(`Converting floor plan blob URL to pending-upload placeholder: ${url}`);
+            return 'pending-upload';
+          }
+          return url;
+        });
+      }
+    }
+    
+    // Clean up specificationUrls array
+    if (req.body.specificationUrls) {
+      // Parse specificationUrls if it's a string
+      if (typeof req.body.specificationUrls === 'string') {
+        try {
+          req.body.specificationUrls = JSON.parse(req.body.specificationUrls);
+        } catch (e) {
+          console.error("Error parsing specificationUrls:", e);
+          req.body.specificationUrls = [];
+        }
+      }
+      
+      // Handle array of strings that might be JSON strings
+      if (Array.isArray(req.body.specificationUrls)) {
+        req.body.specificationUrls = req.body.specificationUrls.flatMap((item: any) => {
+          // If the item is a JSON string, parse it
+          if (typeof item === 'string' && (item.startsWith('[') || item.startsWith('{'))) {
+            try {
+              const parsed = JSON.parse(item);
+              if (Array.isArray(parsed)) {
+                return parsed;
+              }
+              return item;
+            } catch (e) {
+              return item;
+            }
+          }
+          return item;
+        });
+        
+        // Clean up blob URLs
+        req.body.specificationUrls = req.body.specificationUrls.map((url: string) => {
+          if (typeof url === 'string' && url.startsWith('blob:')) {
+            console.log(`Converting specification blob URL to pending-upload placeholder: ${url}`);
+            return 'pending-upload';
+          }
+          return url;
+        });
       }
     }
     
@@ -494,6 +987,11 @@ export async function submitProject(req: Request, res: Response) {
       return res.status(400).json({ error: "Project title is required" });
     }
     
+    // Handle projectCategory field (from form) or category field (from API)
+    if (req.body.projectCategory && !req.body.category) {
+      req.body.category = req.body.projectCategory;
+    }
+    
     if (!req.body.category) {
       return res.status(400).json({ error: "Project category is required" });
     }
@@ -523,6 +1021,59 @@ export async function submitProject(req: Request, res: Response) {
       submitterId = 1;
     }
     
+    // Process gallery URLs if available
+    let galleryUrlsArray: string[] = [];
+    if (req.body.galleryUrls) {
+      if (typeof req.body.galleryUrls === 'string') {
+        try {
+          galleryUrlsArray = JSON.parse(req.body.galleryUrls);
+        } catch (e) {
+          console.error("Error parsing galleryUrls:", e);
+          galleryUrlsArray = [];
+        }
+      } else if (Array.isArray(req.body.galleryUrls)) {
+        galleryUrlsArray = req.body.galleryUrls;
+      }
+    }
+    
+    // Process each gallery URL - handle nested JSON strings and blob URLs
+    galleryUrlsArray = galleryUrlsArray.map(url => {
+      // If it's a string that looks like a JSON array, try to parse it
+      if (typeof url === 'string' && url.startsWith('[') && url.endsWith(']')) {
+        try {
+          const parsed = JSON.parse(url);
+          // If it's an array with one item, use that item
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            url = parsed[0];
+          }
+        } catch (e) {
+          console.error("Error parsing nested gallery URL JSON:", e);
+        }
+      }
+      
+      // Convert blob URLs to pending-upload placeholder
+      if (typeof url === 'string' && url.startsWith('blob:')) {
+        console.log(`Converting blob URL to pending-upload placeholder: ${url}`);
+        return 'pending-upload';
+      }
+      
+      return url;
+    }).filter(url => url); // Remove any empty/null/undefined values
+    
+    console.log("Gallery URLs processed:", galleryUrlsArray);
+    
+    // Handle location map URL if it's a blob URL
+    if (req.body.locationMapUrl && typeof req.body.locationMapUrl === 'string' && req.body.locationMapUrl.startsWith('blob:')) {
+      console.log(`Converting location map blob URL to pending-upload placeholder: ${req.body.locationMapUrl}`);
+      req.body.locationMapUrl = 'pending-upload';
+    }
+    
+    // Handle master plan URL if it's a blob URL
+    if (req.body.masterPlanUrl && typeof req.body.masterPlanUrl === 'string' && req.body.masterPlanUrl.startsWith('blob:')) {
+      console.log(`Converting master plan blob URL to pending-upload placeholder: ${req.body.masterPlanUrl}`);
+      req.body.masterPlanUrl = 'pending-upload';
+    }
+    
     // Prepare project data
     const projectData = {
       title: req.body.title || req.body.projectName,
@@ -539,13 +1090,36 @@ export async function submitProject(req: Request, res: Response) {
       status: req.body.status || 'upcoming',
       amenities: req.body.amenities || [],
       tags: req.body.tags || [req.body.category] || [],
-      imageUrls: Array.isArray(req.body.imageUrls) ? req.body.imageUrls : [],
+      imageUrls: Array.isArray(req.body.imageUrls) 
+        ? req.body.imageUrls.filter((url: string) => url !== 'pending-upload') // Filter out pending-upload placeholders
+        : [],
+      galleryUrls: Array.isArray(galleryUrlsArray) 
+        ? galleryUrlsArray.filter((url: string) => url !== 'pending-upload') // Filter out pending-upload placeholders
+        : [],
       featured: req.body.featured === 'true' || req.body.category === 'featured',
       rating: req.body.rating ? parseFloat(req.body.rating) : null,
       contactNumber: req.body.contactNumber || (req.user?.phone || ''),
       userId: submitterId,
       approvalStatus: 'pending',
     };
+    
+    // Always include uploaded images in the imageUrls array
+    if (uploadedImageUrls.length > 0) {
+      console.log("Adding uploaded images to imageUrls array");
+      
+      // Filter out any pending-upload placeholders
+      const filteredExistingUrls = Array.isArray(projectData.imageUrls) 
+        ? projectData.imageUrls.filter(url => url !== 'pending-upload')
+        : [];
+      
+      // Combine existing URLs with uploaded URLs, ensuring no duplicates
+      const combinedUrls = [...new Set([...filteredExistingUrls, ...uploadedImageUrls])];
+      
+      console.log(`Combined image URLs: ${combinedUrls.length} total (${filteredExistingUrls.length} existing, ${uploadedImageUrls.length} uploaded)`);
+      projectData.imageUrls = combinedUrls;
+    } else if (projectData.imageUrls.length === 0) {
+      console.log("No images found in request body or uploads");
+    }
     
     console.log("Project data validation passed and ready for insertion");
     
@@ -568,11 +1142,19 @@ export async function submitProject(req: Request, res: Response) {
         // Ensure array fields are properly formatted
         amenities: Array.isArray(projectData.amenities) ? projectData.amenities : [],
         tags: Array.isArray(projectData.tags) ? projectData.tags : [],
-        imageUrls: Array.isArray(projectData.imageUrls) ? projectData.imageUrls : []
+        imageUrls: Array.isArray(projectData.imageUrls) ? projectData.imageUrls : [],
+        galleryUrls: Array.isArray(projectData.galleryUrls) ? projectData.galleryUrls : [],
+        floorPlanUrls: Array.isArray(projectData.floorPlanUrls) ? projectData.floorPlanUrls : [],
+        specificationUrls: Array.isArray(projectData.specificationUrls) ? projectData.specificationUrls : [],
+        bhk2Sizes: Array.isArray(projectData.bhk2Sizes) ? projectData.bhk2Sizes : [],
+        bhk3Sizes: Array.isArray(projectData.bhk3Sizes) ? projectData.bhk3Sizes : []
       };
       
       // Log image URLs for debugging
       console.log("Image URLs to be saved:", sanitizedProjectData.imageUrls);
+      console.log("Gallery URLs to be saved:", sanitizedProjectData.galleryUrls);
+      console.log("Floor Plan URLs to be saved:", sanitizedProjectData.floorPlanUrls);
+      console.log("Specification URLs to be saved:", sanitizedProjectData.specificationUrls);
       
       // Print detailed debug information
       console.log("Final project data being inserted:", {
@@ -581,6 +1163,11 @@ export async function submitProject(req: Request, res: Response) {
         amenities: sanitizedProjectData.amenities,
         tags: sanitizedProjectData.tags,
         imageUrls: sanitizedProjectData.imageUrls,
+        galleryUrls: sanitizedProjectData.galleryUrls,
+        floorPlanUrls: sanitizedProjectData.floorPlanUrls,
+        specificationUrls: sanitizedProjectData.specificationUrls,
+        bhk2Sizes: sanitizedProjectData.bhk2Sizes,
+        bhk3Sizes: sanitizedProjectData.bhk3Sizes,
         userId: sanitizedProjectData.userId
       });
       

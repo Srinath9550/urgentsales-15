@@ -140,7 +140,7 @@ export default function SubmissionSuccess() {
                     </Button>
                   ) : (
                     <Button
-                      onClick={() => setLocation("/create-post")}
+                      onClick={() => setLocation("/post-property-free")}
                       className="bg-teal-600 hover:bg-teal-700"
                     >
                       Submit Another Property

@@ -21,7 +21,7 @@ const dummyProperties = [
     title: "Modern 3BHK Apartment with City View",
     price: 8500000,
     urgentPrice: 7990000, // Added urgent price
-    location: "Whitefield, Bangalore",
+    location: "Whitefield, Hyderabad",
     propertyType: "Apartment",
     bedrooms: 3,
     bathrooms: 2,
@@ -37,7 +37,7 @@ const dummyProperties = [
     title: "Spacious 4BHK Villa with Garden",
     price: 15800000,
     urgentPrice: 14200000, // Added urgent price
-    location: "Kormangala, Bangalore",
+    location: "Kormangala, Vijayawada",
     propertyType: "Villa",
     bedrooms: 4,
     bathrooms: 3,
@@ -53,7 +53,7 @@ const dummyProperties = [
     title: "Cozy 2BHK Apartment Near Metro",
     price: 5500000,
     urgentPrice: 5150000, // Added urgent price
-    location: "HSR Layout, Bangalore",
+    location: "HSR Layout, Guntur",
     propertyType: "Apartment",
     bedrooms: 2,
     bathrooms: 2,
@@ -69,7 +69,7 @@ const dummyProperties = [
     title: "Premium 3BHK with Community Pool",
     price: 9200000,
     urgentPrice: 8750000, // Added urgent price
-    location: "Indiranagar, Bangalore",
+    location: "Indiranagar, Vizag",
     propertyType: "Apartment",
     bedrooms: 3,
     bathrooms: 2,
@@ -85,7 +85,7 @@ const dummyProperties = [
     title: "Office Space in Premium Business Park",
     price: 12500000,
     urgentPrice: 11800000, // Added urgent price
-    location: "Electronic City, Bangalore",
+    location: "Electronic City, Vizag",
     propertyType: "Commercial",
     bedrooms: null,
     bathrooms: 2,
@@ -101,7 +101,7 @@ const dummyProperties = [
     title: "Budget 1BHK for Investment",
     price: 3200000,
     urgentPrice: 2990000, // Added urgent price
-    location: "Banashankari, Bangalore",
+    location: "Banashankari, Hyderabad",
     propertyType: "Apartment",
     bedrooms: 1,
     bathrooms: 1,

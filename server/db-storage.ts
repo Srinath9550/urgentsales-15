@@ -14,6 +14,7 @@ import {
 } from "@shared/schema";
 import { IStorage } from "./storage";
 import { db } from "./db";
+import { pool } from "./db"; // Import pool for raw queries
 import { eq, and, desc, gte, lte, inArray, sql, or, like, exists, not, gt, isNotNull } from "drizzle-orm";
 import session from "express-session";
 import createPgSession from "connect-pg-simple";
@@ -512,6 +513,25 @@ export class DbStorage implements IStorage {
   // Recommendation operations
   async addPropertyView(userId: number, propertyId: number): Promise<void> {
     try {
+      // First check if the property exists in the properties table
+      const propertyExists = await db.select({ id: properties.id })
+        .from(properties)
+        .where(eq(properties.id, propertyId))
+        .limit(1);
+      
+      if (propertyExists.length === 0) {
+        // Property doesn't exist in the main properties table
+        // Check if it exists in free_properties table
+        const query = `SELECT id FROM free_properties WHERE id = $1 LIMIT 1`;
+        const result = await pool.query(query, [propertyId]);
+        
+        if (result.rows.length === 0) {
+          // Property doesn't exist in either table, so don't try to add a view
+          console.log(`Property ${propertyId} not found in any table, skipping view tracking`);
+          return;
+        }
+      }
+      
       // Insert the property view
       await db.insert(propertyViews)
         .values({ userId, propertyId, viewedAt: new Date() });

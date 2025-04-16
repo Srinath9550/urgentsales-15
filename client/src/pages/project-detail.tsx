@@ -36,6 +36,7 @@ import {
   Printer,
   FileDown,
   ExternalLink,
+  ChevronLeft,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -74,6 +75,13 @@ interface Project {
   amenities?: string[];
   tags?: string[];
   imageUrls?: string[];
+  galleryUrls?: string[];
+  floorPlanUrls?: string[];
+  specificationUrls?: string[];
+  locationMapUrl?: string;
+  masterPlanUrl?: string;
+  aboutProjectImageUrl?: string;
+  developerLogoUrl?: string;
   imageUrl?: string;
   featured?: boolean;
   rating?: number;
@@ -86,6 +94,33 @@ interface Project {
   rejectionReason?: string;
   createdAt: string;
   updatedAt?: string;
+  bhk2Sizes?: string[];
+  bhk3Sizes?: string[];
+  locationAdvantages?: string;
+  youtubeUrl?: string;
+  loanAmount?: string;
+  interestRate?: string;
+  loanTenure?: string;
+  premiumFeatures?: string;
+  exclusiveServices?: string;
+  affordabilityFeatures?: string;
+  financialSchemes?: string;
+  commercialType?: string;
+  businessAmenities?: string;
+  launchDate?: string;
+  launchOffers?: string;
+  expectedCompletionDate?: string;
+  constructionStatus?: string;
+  saleDeadline?: string;
+  urgencyReason?: string;
+  discountOffered?: string;
+  highlightFeatures?: string;
+  accolades?: string;
+  listingDate?: string;
+  specialIntroOffer?: string;
+  companyProfile?: string;
+  pastProjects?: string;
+  reraNumber?: string;
   floorPlans?: {
     id: string;
     title: string;
@@ -377,7 +412,7 @@ const ProjectDetailPage = () => {
   const openImageModal = (imageUrl: string) => {
     if (imageUrl && typeof imageUrl === 'string' && imageUrl.trim() !== '') {
       // Format the URL using our utility function
-      const formattedUrl = formatImageUrl(imageUrl);
+      const formattedUrl = formatImageUrl(imageUrl, true);
       console.log(`Opening image modal with URL: ${formattedUrl}`);
       
       setModalImage(formattedUrl);
@@ -498,15 +533,63 @@ const ProjectDetailPage = () => {
   const getMainImage = () => {
     // Check if imageUrls is a valid array with at least one valid URL
     if (project.imageUrls && Array.isArray(project.imageUrls) && project.imageUrls.length > 0) {
-      const validUrls = project.imageUrls.filter(url => url && typeof url === 'string' && url.trim() !== '');
+      const validUrls = project.imageUrls.filter(url => url && typeof url === 'string' && url.trim() !== '' && url !== 'pending-upload');
       if (validUrls.length > 0) {
-        return formatImageUrl(validUrls[0]);
+        return formatImageUrl(validUrls[0], true);
+      }
+    }
+    
+    // Check galleryUrls if available
+    if (project.galleryUrls && Array.isArray(project.galleryUrls) && project.galleryUrls.length > 0) {
+      const validGalleryUrls = project.galleryUrls.filter(url => 
+        url && 
+        typeof url === 'string' && 
+        url.trim() !== '' && 
+        url !== 'pending-upload' && 
+        !url.startsWith('blob:')
+      );
+      if (validGalleryUrls.length > 0) {
+        return formatImageUrl(validGalleryUrls[0], true);
+      }
+    }
+    
+    // Check aboutProjectImageUrl if available
+    if (project.aboutProjectImageUrl && typeof project.aboutProjectImageUrl === 'string' && 
+        project.aboutProjectImageUrl.trim() !== '' && project.aboutProjectImageUrl !== 'pending-upload') {
+      return formatImageUrl(project.aboutProjectImageUrl, true);
+    }
+    
+    // Check locationMapUrl if available
+    if (project.locationMapUrl && typeof project.locationMapUrl === 'string' && 
+        project.locationMapUrl.trim() !== '' && project.locationMapUrl !== 'pending-upload') {
+      return formatImageUrl(project.locationMapUrl, true);
+    }
+    
+    // Check masterPlanUrl if available
+    if (project.masterPlanUrl && typeof project.masterPlanUrl === 'string' && 
+        project.masterPlanUrl.trim() !== '' && project.masterPlanUrl !== 'pending-upload') {
+      return formatImageUrl(project.masterPlanUrl, true);
+    }
+    
+    // Check floorPlanUrls if available
+    if (project.floorPlanUrls && Array.isArray(project.floorPlanUrls) && project.floorPlanUrls.length > 0) {
+      const validUrls = project.floorPlanUrls.filter(url => url && typeof url === 'string' && url.trim() !== '' && url !== 'pending-upload');
+      if (validUrls.length > 0) {
+        return formatImageUrl(validUrls[0], true);
+      }
+    }
+    
+    // Check specificationUrls if available
+    if (project.specificationUrls && Array.isArray(project.specificationUrls) && project.specificationUrls.length > 0) {
+      const validUrls = project.specificationUrls.filter(url => url && typeof url === 'string' && url.trim() !== '' && url !== 'pending-upload');
+      if (validUrls.length > 0) {
+        return formatImageUrl(validUrls[0], true);
       }
     }
     
     // Fallback to imageUrl if available
-    if (project.imageUrl && typeof project.imageUrl === 'string' && project.imageUrl.trim() !== '') {
-      return formatImageUrl(project.imageUrl);
+    if (project.imageUrl && typeof project.imageUrl === 'string' && project.imageUrl.trim() !== '' && project.imageUrl !== 'pending-upload') {
+      return formatImageUrl(project.imageUrl, true);
     }
     
     // Default placeholder
@@ -543,15 +626,16 @@ const ProjectDetailPage = () => {
       )}
 
       {/* Hero Banner with Form Overlay */}
-      <div className="mb-6 text-sm text-gray-500">
-            <button
-              onClick={() => window.history.back()}
-              className="hover:text-primary focus:outline-none"
-            >
-              ← Back
-            </button>
-          </div>
       <div className="relative w-full h-[100vh] sm:h-[90vh] overflow-hidden print:h-[30vh]">
+        <div className="absolute top-1 right-0 z-10">
+          <div className="bg-white/90 text-primary px-3 py-1.5 rounded-md shadow-md backdrop-blur-sm text-xs sm:text-sm font-medium flex items-center gap-1.5 border border-primary/20">
+            <span className="text-gray-700 font-normal">Powered by</span>
+            <span className="font-semibold cursor-pointer" onClick={() => navigate("/")}>
+              <span className="text-[darkRed]">Urgent</span>
+              <span className="text-[#000112]">Sales</span>
+            </span>
+          </div>
+        </div>
         
         <motion.img 
           initial={{ scale: 1.1, opacity: 0.8 }}
@@ -559,12 +643,8 @@ const ProjectDetailPage = () => {
           transition={{ duration: 0.7 }}
           src={mainImage} 
           alt={project.title} 
-          className="w-full h-full object-cover"
-          onError={(e) => {
-            const target = e.target as HTMLImageElement;
-            target.onerror = null;
-            target.src = "/placeholder-project.jpg";
-          }}
+          className="w-full h-full object-cover object-center"
+          onError={(e) => handleImageError(e, "/placeholder-project.jpg", true)}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent flex flex-col justify-end">
           <div className="container mx-auto px-4 flex flex-col h-full pb-8 md:pb-16">
@@ -679,6 +759,7 @@ const ProjectDetailPage = () => {
                     alt={project.builder} 
                     className="h-8 w-auto bg-white rounded-md p-1"
                     onError={(e) => {
+                      // Hide the image on error instead of showing a placeholder
                       const target = e.target as HTMLImageElement;
                       target.onerror = null;
                       target.style.display = 'none';
@@ -770,13 +851,9 @@ const ProjectDetailPage = () => {
                       <img 
                         src={selectedPlan.image || "/placeholder-floorplan.jpg"} 
                         alt="Floor Plan" 
-                        className="w-full h-auto object-contain cursor-pointer"
+                        className="w-full h-auto object-contain bg-gray-50 rounded-md cursor-pointer"
                         onClick={() => openImageModal(selectedPlan.image || "/placeholder-floorplan.jpg")}
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement;
-                          target.onerror = null;
-                          target.src = "/placeholder-floorplan.jpg";
-                        }}
+                        onError={(e) => handleImageError(e, "/placeholder-floorplan.jpg", true)}
                       />
                     </div>
                     <div className="p-4">
@@ -857,61 +934,72 @@ const ProjectDetailPage = () => {
                   >
                     <div className="flex min-w-max">
                       <div className="grid grid-cols-4 gap-x-6 divide-x divide-gray-200">
-                        {/* Column 1 */}
-                        <div className="pr-6 min-w-[200px]">
-                          <ul className="space-y-4">
-                            {enhancedProject.amenities.slice(0, Math.ceil(enhancedProject.amenities.length / 4)).map((amenity, index) => (
-                              <li key={`col1-${index}`} className="flex items-center gap-2">
-                                <div className="w-2 h-2 rounded-full bg-primary flex-shrink-0"></div>
-                                <span className="text-sm">{amenity}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                        
-                        {/* Column 2 */}
-                        <div className="px-6 min-w-[200px]">
-                          <ul className="space-y-4">
-                            {enhancedProject.amenities.slice(
-                              Math.ceil(enhancedProject.amenities.length / 4),
-                              Math.ceil(enhancedProject.amenities.length / 4) * 2
-                            ).map((amenity, index) => (
-                              <li key={`col2-${index}`} className="flex items-center gap-2">
-                                <div className="w-2 h-2 rounded-full bg-primary flex-shrink-0"></div>
-                                <span className="text-sm">{amenity}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                        
-                        {/* Column 3 */}
-                        <div className="px-6 min-w-[200px]">
-                          <ul className="space-y-4">
-                            {enhancedProject.amenities.slice(
-                              Math.ceil(enhancedProject.amenities.length / 4) * 2,
-                              Math.ceil(enhancedProject.amenities.length / 4) * 3
-                            ).map((amenity, index) => (
-                              <li key={`col3-${index}`} className="flex items-center gap-2">
-                                <div className="w-2 h-2 rounded-full bg-primary flex-shrink-0"></div>
-                                <span className="text-sm">{amenity}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                        
-                        {/* Column 4 */}
-                        <div className="pl-6 min-w-[200px]">
-                          <ul className="space-y-4">
-                            {enhancedProject.amenities.slice(
-                              Math.ceil(enhancedProject.amenities.length / 4) * 3
-                            ).map((amenity, index) => (
-                              <li key={`col4-${index}`} className="flex items-center gap-2">
-                                <div className="w-2 h-2 rounded-full bg-primary flex-shrink-0"></div>
-                                <span className="text-sm">{amenity}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
+                        {/* Calculate the number of items per column once */}
+                        {(() => {
+                          const totalAmenities = enhancedProject.amenities.length;
+                          const itemsPerColumn = Math.ceil(totalAmenities / 4);
+                          
+                          // Column 1
+                          const column1Items = enhancedProject.amenities.slice(0, itemsPerColumn);
+                          // Column 2
+                          const column2Items = enhancedProject.amenities.slice(itemsPerColumn, itemsPerColumn * 2);
+                          // Column 3
+                          const column3Items = enhancedProject.amenities.slice(itemsPerColumn * 2, itemsPerColumn * 3);
+                          // Column 4
+                          const column4Items = enhancedProject.amenities.slice(itemsPerColumn * 3);
+                          
+                          return (
+                            <>
+                              {/* Column 1 */}
+                              <div className="pr-6 min-w-[200px]">
+                                <ul className="space-y-4">
+                                  {column1Items.map((amenity, index) => (
+                                    <li key={`col1-${index}`} className="flex items-center gap-2">
+                                      <div className="w-2 h-2 rounded-full bg-primary flex-shrink-0"></div>
+                                      <span className="text-sm">{amenity}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                              
+                              {/* Column 2 */}
+                              <div className="px-6 min-w-[200px]">
+                                <ul className="space-y-4">
+                                  {column2Items.map((amenity, index) => (
+                                    <li key={`col2-${index}`} className="flex items-center gap-2">
+                                      <div className="w-2 h-2 rounded-full bg-primary flex-shrink-0"></div>
+                                      <span className="text-sm">{amenity}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                              
+                              {/* Column 3 */}
+                              <div className="px-6 min-w-[200px]">
+                                <ul className="space-y-4">
+                                  {column3Items.map((amenity, index) => (
+                                    <li key={`col3-${index}`} className="flex items-center gap-2">
+                                      <div className="w-2 h-2 rounded-full bg-primary flex-shrink-0"></div>
+                                      <span className="text-sm">{amenity}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                              
+                              {/* Column 4 */}
+                              <div className="pl-6 min-w-[200px]">
+                                <ul className="space-y-4">
+                                  {column4Items.map((amenity, index) => (
+                                    <li key={`col4-${index}`} className="flex items-center gap-2">
+                                      <div className="w-2 h-2 rounded-full bg-primary flex-shrink-0"></div>
+                                      <span className="text-sm">{amenity}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            </>
+                          );
+                        })()}
                       </div>
                     </div>
                   </div>
@@ -924,7 +1012,7 @@ const ProjectDetailPage = () => {
               // Validate image URLs
               const validImageUrls = project.imageUrls && Array.isArray(project.imageUrls) 
                 ? project.imageUrls
-                    .filter(url => url && typeof url === 'string' && url.trim() !== '')
+                    .filter(url => url && typeof url === 'string' && url.trim() !== '' && url !== 'pending-upload')
                     .map(url => {
                       // Handle relative URLs by prepending the base URL if needed
                       if (url.startsWith('/')) {
@@ -932,16 +1020,92 @@ const ProjectDetailPage = () => {
                       }
                       return url;
                     })
-                    .map(url => {
-                      // Handle relative URLs by prepending the base URL if needed
-                      if (url.startsWith('/')) {
-                        return `${window.location.origin}${url}`;
-                      }
-                      return url;
-                    })
+                    .map(url => formatImageUrl(url, true))
                 : [];
                 
-              if (validImageUrls.length > 0) {
+              // Validate gallery URLs
+              const validGalleryUrls = project.galleryUrls && Array.isArray(project.galleryUrls) 
+                ? project.galleryUrls
+                    .filter(url => 
+                      url && 
+                      typeof url === 'string' && 
+                      url.trim() !== '' && 
+                      url !== 'pending-upload' && 
+                      !url.startsWith('blob:')
+                    )
+                    .map(url => {
+                      // Handle relative URLs by prepending the base URL if needed
+                      if (url.startsWith('/')) {
+                        return `${window.location.origin}${url}`;
+                      }
+                      return url;
+                    })
+                    .map(url => formatImageUrl(url, true))
+                : [];
+                
+              // Get floor plan URLs
+              const validFloorPlanUrls = project.floorPlanUrls && Array.isArray(project.floorPlanUrls) 
+                ? project.floorPlanUrls
+                    .filter(url => url && typeof url === 'string' && url.trim() !== '' && url !== 'pending-upload')
+                    .map(url => {
+                      if (url.startsWith('/')) {
+                        return `${window.location.origin}${url}`;
+                      }
+                      return url;
+                    })
+                    .map(url => formatImageUrl(url, true))
+                : [];
+                
+              // Get specification URLs
+              const validSpecUrls = project.specificationUrls && Array.isArray(project.specificationUrls) 
+                ? project.specificationUrls
+                    .filter(url => url && typeof url === 'string' && url.trim() !== '' && url !== 'pending-upload')
+                    .map(url => {
+                      if (url.startsWith('/')) {
+                        return `${window.location.origin}${url}`;
+                      }
+                      return url;
+                    })
+                    .map(url => formatImageUrl(url, true))
+                : [];
+                
+              // Get location map URL
+              const locationMapUrl = project.locationMapUrl && typeof project.locationMapUrl === 'string' && 
+                project.locationMapUrl.trim() !== '' && project.locationMapUrl !== 'pending-upload'
+                ? formatImageUrl(project.locationMapUrl, true)
+                : null;
+                
+              // Get master plan URL
+              const masterPlanUrl = project.masterPlanUrl && typeof project.masterPlanUrl === 'string' && 
+                project.masterPlanUrl.trim() !== '' && project.masterPlanUrl !== 'pending-upload'
+                ? formatImageUrl(project.masterPlanUrl, true)
+                : null;
+                
+              // Get about project image URL
+              const aboutProjectImageUrl = project.aboutProjectImageUrl && typeof project.aboutProjectImageUrl === 'string' && 
+                project.aboutProjectImageUrl.trim() !== '' && project.aboutProjectImageUrl !== 'pending-upload'
+                ? formatImageUrl(project.aboutProjectImageUrl, true)
+                : null;
+                
+              // Get developer logo URL
+              const developerLogoUrl = project.developerLogoUrl && typeof project.developerLogoUrl === 'string' && 
+                project.developerLogoUrl.trim() !== '' && project.developerLogoUrl !== 'pending-upload'
+                ? formatImageUrl(project.developerLogoUrl, true)
+                : null;
+                
+              // Combine all arrays for display
+              const allValidImageUrls = [
+                ...validImageUrls, 
+                ...validGalleryUrls,
+                ...validFloorPlanUrls,
+                ...validSpecUrls,
+                ...(locationMapUrl ? [locationMapUrl] : []),
+                ...(masterPlanUrl ? [masterPlanUrl] : []),
+                ...(aboutProjectImageUrl ? [aboutProjectImageUrl] : []),
+                ...(developerLogoUrl ? [developerLogoUrl] : [])
+              ];
+                
+              if (allValidImageUrls.length > 0) {
                 return (
                   <motion.div 
                     initial={{ opacity: 0, y: 20 }}
@@ -956,53 +1120,71 @@ const ProjectDetailPage = () => {
                       {/* Scrollable Gallery Container with Touch Slide */}
                       <div 
                         id="gallery-container"
-                        className="overflow-x-auto pb-4 scrollbar-hide touch-pan-x"
+                        className="overflow-x-auto pb-4 scrollbar-hide touch-pan-x snap-x snap-mandatory scroll-smooth"
                         ref={(el) => {
-                          if (el) {
-                            // Enable auto-sliding
-                            const autoSlideInterval = setInterval(() => {
-                              if (el && !el.matches(':hover')) {
-                                el.scrollBy({ left: 320, behavior: 'smooth' });
-                                // Reset to beginning when reaching the end
-                                if (el.scrollLeft + el.clientWidth >= el.scrollWidth - 10) {
-                                  setTimeout(() => {
-                                    el.scrollTo({ left: 0, behavior: 'smooth' });
-                                  }, 1000);
-                                }
-                              }
-                            }, 5000);
+                          // No auto-sliding functionality
+                          return undefined;
+                        }}
+                        onTouchStart={(e) => {
+                          const touchStartX = e.touches[0].clientX;
+                          const container = e.currentTarget;
+                          
+                          // Store initial touch position and scroll position
+                          container.dataset.touchStartX = touchStartX.toString();
+                          container.dataset.scrollLeft = container.scrollLeft.toString();
+                        }}
+                        onTouchMove={(e) => {
+                          const container = e.currentTarget;
+                          const touchStartX = parseFloat(container.dataset.touchStartX || '0');
+                          const initialScrollLeft = parseFloat(container.dataset.scrollLeft || '0');
+                          const currentTouchX = e.touches[0].clientX;
+                          const diff = touchStartX - currentTouchX;
+                          
+                          // Apply scroll based on touch movement
+                          container.scrollLeft = initialScrollLeft + diff;
+                        }}
+                        onTouchEnd={(e) => {
+                          const container = e.currentTarget;
+                          const touchStartX = parseFloat(container.dataset.touchStartX || '0');
+                          const touchEndX = e.changedTouches[0].clientX;
+                          const diff = touchStartX - touchEndX;
+                          
+                          // Determine if it's a swipe and which direction
+                          if (Math.abs(diff) > 50) {
+                            // Find the closest snap point
+                            const itemWidth = 320; // Approximate width of each item
+                            const targetIndex = Math.round((container.scrollLeft + (diff > 0 ? itemWidth/2 : -itemWidth/2)) / itemWidth);
+                            container.scrollTo({
+                              left: targetIndex * itemWidth,
+                              behavior: 'smooth'
+                            });
                             
-                            // Clean up interval when component unmounts
-                            return () => clearInterval(autoSlideInterval);
+                            // Update active image indicator
+                            setActiveImage(Math.min(targetIndex, allValidImageUrls.length - 1));
                           }
                         }}
                       >
                         <div className="flex gap-4">
-                          {validImageUrls.map((imageUrl, index) => (
+                          {allValidImageUrls.map((imageUrl, index) => (
                             <div 
                               key={index} 
-                              className="relative min-w-[280px] sm:min-w-[320px] aspect-[4/3] rounded-lg overflow-hidden cursor-pointer hover:opacity-90 transition-opacity flex-shrink-0"
-                              onClick={() => openImageModal(imageUrl)}
+                              className="min-w-[280px] w-[280px] xs:min-w-[300px] xs:w-[300px] sm:min-w-[320px] sm:w-[320px] md:min-w-[350px] md:w-[350px] aspect-[4/3] rounded-lg overflow-hidden cursor-zoom-in hover:opacity-90 transition-opacity flex-shrink-0 snap-center"
+                              onClick={() => {
+                                setModalImage(imageUrl);
+                                setIsImageModalOpen(true);
+                                document.body.style.overflow = 'hidden';
+                                setActiveImage(index);
+                              }}
                             >
-                              <img 
-                                src={imageUrl} 
-                                alt={`${project.title} - Image ${index + 1}`} 
-                                className="w-full h-full object-cover"
-                                onError={(e) => {
-                                  console.log(`Error loading image at index ${index}:`, imageUrl);
-                                  const target = e.target as HTMLImageElement;
-                                  target.onerror = null;
-                                  
-                                  // Try with origin prepended if it's a relative URL
-                                  if (imageUrl.startsWith('/') && !imageUrl.startsWith(`${window.location.origin}/`)) {
-                                    const fullUrl = `${window.location.origin}${imageUrl}`;
-                                    console.log(`Trying with full URL: ${fullUrl}`);
-                                    target.src = fullUrl;
-                                  } else {
-                                    target.src = "/placeholder-project.jpg";
-                                  }
-                                }}
-                              />
+                              <div className="w-full h-full bg-gray-50">
+                                <img 
+                                  src={imageUrl} 
+                                  alt={`${project.title} - Image ${index + 1}`} 
+                                  className="w-full h-full object-cover object-center"
+                                  onError={(e) => handleImageError(e, "/placeholder-project.jpg", true)}
+                                  loading="lazy"
+                                />
+                              </div>
                             </div>
                           ))}
                         </div>
@@ -1011,27 +1193,25 @@ const ProjectDetailPage = () => {
                     
                     {/* Thumbnail Navigation Indicators */}
                     <div className="mt-4 flex justify-center gap-2">
-                      {validImageUrls.slice(0, 5).map((_, index) => (
+                      {allValidImageUrls.map((_, index) => (
                         <button
                           key={index}
-                          className={`w-2 h-2 rounded-full ${index === 0 ? 'bg-primary' : 'bg-gray-300'} transition-colors duration-300`}
+                          className={`w-2 h-2 rounded-full ${index === activeImage ? 'bg-primary' : 'bg-gray-300'} transition-colors duration-300`}
                           onClick={() => {
                             const container = document.getElementById('gallery-container');
                             const items = document.querySelectorAll('#gallery-container > div > div');
                             if (container && items[index]) {
                               const scrollLeft = (items[index] as HTMLElement).offsetLeft - container.offsetLeft;
                               container.scrollTo({ left: scrollLeft, behavior: 'smooth' });
+                              setActiveImage(index);
                             }
                           }}
                         />
                       ))}
-                      {validImageUrls.length > 5 && (
-                        <span className="text-xs text-gray-500">+{validImageUrls.length - 5}</span>
-                      )}
                     </div>
                     
-                    {/* Touch Slide Hint - Only visible on mobile */}
-                    <div className="mt-2 text-center text-xs text-gray-500 sm:hidden">
+                    {/* Touch Slide Hint */}
+                    <div className="mt-2 text-center text-xs text-gray-500">
                       <span>← Swipe to view more →</span>
                     </div>
                   </motion.div>
@@ -1041,7 +1221,7 @@ const ProjectDetailPage = () => {
             })()}
 
             {/* Specifications Section */}
-            {enhancedProject.specifications && enhancedProject.specifications.length > 0 && (
+            {/* {enhancedProject.specifications && enhancedProject.specifications.length > 0 && (
               <motion.div 
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -1053,7 +1233,7 @@ const ProjectDetailPage = () => {
                 
                 <div className="relative">
                   {/* Scrollable Specifications Container with Touch Slide */}
-                  <div 
+                  {/* <div 
                     id="specifications-container"
                     className="overflow-x-auto pb-4 scrollbar-hide touch-pan-x"
                     ref={(el) => {
@@ -1099,10 +1279,10 @@ const ProjectDetailPage = () => {
                       ))}
                     </div>
                   </div>
-                </div>
+                </div> */}
                 
                 {/* Thumbnail Navigation Indicators */}
-                <div className="mt-4 flex justify-center gap-2">
+                {/* <div className="mt-4 flex justify-center gap-2">
                   {enhancedProject.specifications.slice(0, 5).map((_, index) => (
                     <button
                       key={index}
@@ -1120,14 +1300,14 @@ const ProjectDetailPage = () => {
                   {enhancedProject.specifications.length > 5 && (
                     <span className="text-xs text-gray-500">+{enhancedProject.specifications.length - 5}</span>
                   )}
-                </div>
+                </div> */}
                 
                 {/* Touch Slide Hint - Only visible on mobile */}
-                <div className="mt-2 text-center text-xs text-gray-500 sm:hidden">
+                {/* <div className="mt-2 text-center text-xs text-gray-500 sm:hidden">
                   <span>← Swipe to view more →</span>
                 </div>
               </motion.div>
-            )}
+            )}  */}
 
             {/* Location Section */}
             <motion.div 
@@ -1147,7 +1327,7 @@ const ProjectDetailPage = () => {
                 >
                   Location Advantages
                 </button>
-                <button 
+                {/* <button 
                   className={`py-2 px-4 sm:px-6 text-sm sm:text-base font-medium ${locationTab === 'map' ? 'bg-gray-200' : 'bg-gray-100'}`}
                   onClick={() => setLocationTab('map')}
                 >
@@ -1158,7 +1338,7 @@ const ProjectDetailPage = () => {
                   onClick={() => setLocationTab('masterplan')}
                 >
                   Master Plan
-                </button>
+                </button> */}
               </div>
               
               {/* Tab Content */}
@@ -1188,7 +1368,7 @@ const ProjectDetailPage = () => {
                 )}
                 
                 {/* Location Map Tab */}
-                {locationTab === 'map' && (
+                {/* {locationTab === 'map' && (
                   <div>
                     {project.locationMapUrl ? (
                       <div className="aspect-video rounded-lg overflow-hidden border">
@@ -1212,17 +1392,17 @@ const ProjectDetailPage = () => {
                       </div>
                     )}
                   </div>
-                )}
+                )} */}
                 
                 {/* Master Plan Tab */}
-                {locationTab === 'masterplan' && (
+                {/* {locationTab === 'masterplan' && (
                   <div>
                     {project.masterPlanUrl ? (
                       <div className="aspect-video rounded-lg overflow-hidden border">
                         <img 
                           src={project.masterPlanUrl} 
                           alt="Master Plan" 
-                          className="w-full h-full object-contain"
+                          className="w-full h-full object-contain bg-gray-50"
                           onClick={() => openImageModal(project.masterPlanUrl || '')}
                           onError={(e) => {
                             const target = e.target as HTMLImageElement;
@@ -1240,7 +1420,7 @@ const ProjectDetailPage = () => {
                       </div>
                     )}
                   </div>
-                )}
+                )} */}
               </div>
             </motion.div>
 
@@ -1410,9 +1590,9 @@ const ProjectDetailPage = () => {
                     <div className="md:w-1/3 flex-shrink-0">
                       <div className="rounded-lg overflow-hidden border">
                         <img 
-                          src={project.imageUrls?.[0] || '/placeholder-project.jpg'} 
+                          src={formatImageUrl(project.imageUrls?.[0]) || '/placeholder-project.jpg'}
                           alt={project.title} 
-                          className="w-full h-auto object-cover aspect-[4/3]"
+                          className="w-full h-auto object-contain bg-gray-50 aspect-[4/3]"
                           onError={(e) => {
                             const target = e.target as HTMLImageElement;
                             target.onerror = null;
@@ -1483,7 +1663,7 @@ const ProjectDetailPage = () => {
                                 <img 
                                   src={bank.logo} 
                                   alt={bank.name} 
-                                  className="max-h-full object-contain"
+                                  className="max-h-full object-contain max-w-[50px]"
                                   onError={(e) => {
                                     const target = e.target as HTMLImageElement;
                                     target.onerror = null;
@@ -1509,18 +1689,18 @@ const ProjectDetailPage = () => {
                   <div className="flex flex-col md:flex-row gap-6">
                     {/* Developer Logo */}
                     <div className="md:w-1/3 flex-shrink-0">
-                      <div className="bg-white rounded-lg overflow-hidden border flex items-center justify-center p-4" style={{height: '200px'}}>
+                      {/* <div className="bg-white rounded-lg overflow-hidden border flex items-center justify-center p-4" style={{height: '200px'}}>
                         <img 
                           src={project.builderLogo || "/placeholder-logo.png"} 
                           alt={project.builder} 
-                          className="w-full h-full object-contain"
+                          className="w-full h-full object-contain max-h-[150px]"
                           onError={(e) => {
                             const target = e.target as HTMLImageElement;
                             target.onerror = null;
                             target.src = "/placeholder-logo.png";
                           }}
                         />
-                      </div>
+                      </div> */}
                     </div>
                     
                     {/* Developer Details */}
@@ -1589,7 +1769,7 @@ const ProjectDetailPage = () => {
       {/* Image Modal */}
       {isImageModalOpen && (
         <div className="fixed inset-0 z-50 bg-black bg-opacity-90 flex items-center justify-center p-4">
-          <div className="relative w-full max-w-4xl mx-auto">
+          <div className="relative w-full max-w-5xl mx-auto">
             {/* Close button */}
             <button 
               onClick={closeImageModal}
@@ -1599,13 +1779,27 @@ const ProjectDetailPage = () => {
             </button>
             
             {/* Image */}
-            <div className="relative w-full h-[80vh] flex items-center justify-center">
+            <div className="relative w-full h-[85vh] flex items-center justify-center">
               <img 
                 src={modalImage} 
                 alt="Enlarged view" 
-                className="max-w-full max-h-full object-contain"
-                onError={(e) => handleImageError(e)}
+                className="max-w-full max-h-full object-contain bg-gray-900"
+                onError={(e) => handleImageError(e, undefined, true)}
               />
+            </div>
+            
+            {/* Download button */}
+            <div className="absolute bottom-4 right-4">
+              <a 
+                href={modalImage} 
+                download
+                target="_blank"
+                rel="noopener noreferrer"
+                className="bg-primary text-white px-3 py-2 rounded-md flex items-center gap-2 hover:bg-primary/90 transition-colors"
+              >
+                <Download className="h-4 w-4" />
+                <span>Download</span>
+              </a>
             </div>
           </div>
         </div>

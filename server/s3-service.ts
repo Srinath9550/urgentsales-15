@@ -109,6 +109,12 @@ export async function getSignedImageUrl(key: string, expiresIn: number = 3600): 
       return '';
     }
     
+    // Special case for "pending-upload" placeholder and blob URLs
+    if (key === 'pending-upload' || (typeof key === 'string' && key.startsWith('blob:'))) {
+      console.log('Handling pending-upload or blob URL placeholder in getSignedImageUrl');
+      return '';
+    }
+    
     // Clean up the key - remove any leading slashes or URL components
     let cleanKey = key.trim();
     
@@ -145,8 +151,11 @@ export async function getSignedImageUrl(key: string, expiresIn: number = 3600): 
       return '';
     }
     
+    // Ensure bucket name is defined
+    const bucketName = process.env.AWS_BUCKET_NAME || 'property-images-urgent-sales';
+    
     const command = new GetObjectCommand({
-      Bucket: process.env.AWS_BUCKET_NAME,
+      Bucket: bucketName,
       Key: cleanKey
     });
 
@@ -155,6 +164,31 @@ export async function getSignedImageUrl(key: string, expiresIn: number = 3600): 
     return signedUrl;
   } catch (error) {
     console.error(`Error generating signed URL for key ${key}:`, error);
+    
+    // If we can't generate a signed URL, try to return a direct S3 URL as fallback
+    try {
+      if (key && typeof key === 'string' && key.trim() !== '' && key !== 'pending-upload') {
+        // Clean the key
+        let cleanKey = key.trim();
+        if (cleanKey.includes('amazonaws.com')) {
+          const urlParts = cleanKey.split('amazonaws.com/');
+          if (urlParts.length > 1) {
+            cleanKey = urlParts[1];
+          }
+        }
+        cleanKey = cleanKey.startsWith('/') ? cleanKey.substring(1) : cleanKey;
+        
+        // Generate direct URL
+        const bucketName = process.env.AWS_BUCKET_NAME || 'property-images-urgent-sales';
+        const region = process.env.AWS_BUCKET_REGION || 'ap-south-1';
+        const directUrl = `https://${bucketName}.s3.${region}.amazonaws.com/${cleanKey}`;
+        console.log(`Falling back to direct S3 URL: ${directUrl}`);
+        return directUrl;
+      }
+    } catch (fallbackError) {
+      console.error('Error generating fallback URL:', fallbackError);
+    }
+    
     return '';
   }
 }

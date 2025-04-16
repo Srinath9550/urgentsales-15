@@ -258,7 +258,7 @@ export default function TopProperties() {
 
         <div className="mt-3 sm:mt-4">
           <Link
-            href="/top-properties-view/${count}?category=${categoryId}"
+            href="/top-properties"
             className="text-primary hover:underline text-sm font-medium flex items-center justify-end"
             onClick={() => window.scrollTo(0, 0)}
           >

@@ -19,23 +19,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatImageUrl, handleImageError } from "@/lib/image-utils";
 
-interface Project {
-  id: string;
-  title: string;
-  location: string;
-  city: string;
-  state?: string;
-  price: string;
-  bhkConfig: string;
-  imageUrl: string;
-  builder: string;
-  priceRange?: string;
-  amenities?: string[];
-  launchDate?: string;
-  possessionDate?: string;
-  featured?: boolean;
-  tags?: string[];
-}
+import { UpcomingProject as Project } from "@/types/property-types";
 
 export default function UpcomingProjects() {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -63,16 +47,24 @@ export default function UpcomingProjects() {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // Fetch upcoming projects data
+  // Fetch upcoming projects data - specifically with category "upcoming"
   const { data: projects, isLoading } = useQuery<Project[]>({
     queryKey: ["/api/projects/upcoming"],
+    queryFn: async () => {
+      const response = await fetch("/api/projects/upcoming?category=upcoming");
+      if (!response.ok) {
+        throw new Error("Failed to fetch upcoming projects");
+      }
+      return response.json();
+    },
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
 
   console.log("Projects data:", projects); // Add this for debugging
 
-  // Filter projects based on active tab
+  // Filter projects based on active tab - we're already filtering for "upcoming" category on the server
   const filteredProjects = projects?.filter((project) => {
+    // Apply tab filters
     if (activeTab === "all") return true;
     if (activeTab === "telangana") return project.state === "Telangana";
     if (activeTab === "andhra") return project.state === "Andhra Pradesh";
@@ -316,14 +308,34 @@ function ProjectCard({ project }: ProjectCardProps) {
   };
 
   return (
-    <Link href={`/project/${project.id}`} onClick={() => window.scrollTo(0, 0)}>
+    <Link href={`/project-detail/${project.id}`} onClick={() => window.scrollTo(0, 0)}>
       <div className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300 overflow-hidden border border-gray-100 h-full group">
         <div className="relative">
+          {/* Debug info */}
+          {console.log('Project image data:', {
+            id: project.id,
+            title: project.title,
+            hasImageUrls: project.imageUrls && project.imageUrls.length > 0,
+            imageUrlsLength: project.imageUrls ? project.imageUrls.length : 0,
+            firstImageUrl: project.imageUrls && project.imageUrls.length > 0 ? project.imageUrls[0] : null,
+            imageUrl: project.imageUrl || 'none',
+            finalUrl: formatImageUrl(
+              project.imageUrls && project.imageUrls.length > 0 
+                ? project.imageUrls[0] 
+                : project.imageUrl || '', 
+              true
+            )
+          })}
           <img
-            src={formatImageUrl(project.imageUrl)}
+            src={formatImageUrl(
+              project.imageUrls && project.imageUrls.length > 0 
+                ? project.imageUrls[0] 
+                : project.imageUrl || '', 
+              true
+            )}
             alt={project.title}
             className="w-full h-40 sm:h-48 object-cover group-hover:scale-105 transition-transform duration-300"
-            onError={(e) => handleImageError(e)}
+            onError={(e) => handleImageError(e, undefined, true)}
           />
           {project.featured && (
             <div className="absolute top-2 left-2 bg-yellow-500 text-white text-xs px-2 py-1 rounded-md">
@@ -381,7 +393,16 @@ function ProjectCard({ project }: ProjectCardProps) {
           </div>
           <div className="mt-3 flex justify-between items-center">
             <div className="text-xs text-gray-500">By {project.builder}</div>
-            <Button size="sm" variant="outline" className="text-xs h-7 px-2">
+            <Button 
+              size="sm" 
+              variant="outline" 
+              className="text-xs h-7 px-2"
+              onClick={(e) => {
+                e.preventDefault(); // Prevent the parent Link from also triggering
+                window.scrollTo(0, 0);
+                window.location.href = `/project-detail/${project.id}`;
+              }}
+            >
               Details
             </Button>
           </div>

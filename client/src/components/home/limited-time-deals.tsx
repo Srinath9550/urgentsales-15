@@ -552,11 +552,17 @@ export default function LimitedTimeDeals() {
               🚨 Limited-Time Deals – Act Fast!
             </h2>
           </div>
-          <p className="text-sm md:text-base text-gray-600 max-w-2xl">
+          <p className="text-sm md:text-base text-gray-600 max-w-2xl mb-4">
             Buy properties at exclusive discounts in Andhra Pradesh and
             Telangana before time runs out! These special offers are available
             for a very limited time only.
           </p>
+          <Button 
+            onClick={() => navigate('/properties?category=urgent')}
+            className="bg-red-600 hover:bg-red-700 text-white"
+          >
+            View All Urgent Deals
+          </Button>
         </div>
 
         {/* Improved scrolling container with navigation arrows */}
@@ -631,7 +637,7 @@ export default function LimitedTimeDeals() {
                 <div
                   key={`${deal.id}-${index}`}
                   className="flex-shrink-0 w-48 sm:w-56 md:w-64 h-auto rounded-lg overflow-hidden shadow-md border border-gray-200 transition-transform hover:shadow-lg hover:-translate-y-1 cursor-pointer"
-                  onClick={() => navigate(`/properties/${deal.id}`)}
+                  onClick={() => navigate(`/properties?category=urgent&id=${deal.id}`)}
                   style={{
                     willChange: "transform",
                     backfaceVisibility: "hidden",
@@ -718,6 +724,21 @@ export default function LimitedTimeDeals() {
                         <Clock className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
                         <span>{formatTimeLeft(deal.id)}</span>
                       </div>
+                    </div>
+                    
+                    {/* View Details Button */}
+                    <div className="mt-2 flex justify-end">
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        className="text-[10px] sm:text-xs h-6 px-2 py-0 border-red-500 text-red-600 hover:bg-red-50"
+                        onClick={(e) => {
+                          e.stopPropagation(); // Prevent the parent div's onClick from firing
+                          navigate(`/properties?category=urgent&id=${deal.id}`);
+                        }}
+                      >
+                        View Deal
+                      </Button>
                     </div>
                   </div>
                 </div>

@@ -99,9 +99,9 @@ const projectCategories = [
   { id: "upcoming", label: "Upcoming Projects", icon: Clock },
   { id: "luxury", label: "Luxury Projects", icon: Castle },
   { id: "affordable", label: "Affordable Projects", icon: Home },
-  { id: "newly_listed", label: "Newly Listed Properties", icon: Clock },
-  { id: "top_urgent", label: "Top Urgent Sales", icon: TrendingUp },
-  { id: "company_projects", label: "Company Projects", icon: Briefcase },
+  // { id: "newly_listed", label: "Newly Listed Properties", icon: Clock },
+  // { id: "top_urgent", label: "Top Urgent Sales", icon: TrendingUp },
+  // { id: "company_projects", label: "Company Projects", icon: Briefcase },
 ] as const;
 
 // Define the form schema
@@ -184,10 +184,31 @@ export default function SubmitProjectPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [previewMode, setPreviewMode] = useState(false);
   const [formData, setFormData] = useState<ProjectFormValues | null>(null);
+  
+  // Import the formatImageUrl function from the image-utils library
+  // This is just a wrapper to maintain backward compatibility
+  const formatProjectImageUrl = (url: string) => {
+    // Use the imported formatImageUrl function with isProject=true
+    if (!url) {
+      return '/images/property-placeholder.jpg';
+    }
+    
+    // Special case for pending-upload
+    if (url === 'pending-upload') {
+      return '/images/property-placeholder.jpg';
+    }
+    
+    // Use the imported formatImageUrl function from image-utils
+    return formatImageUrl(url, true);
+  };
 
   // Add state for hero image file
   const [heroImage, setHeroImage] = useState<File | null>(null);
   const [heroImagePreview, setHeroImagePreview] = useState<string | null>(null);
+
+  // State for gallery images
+  const [galleryImages, setGalleryImages] = useState<File[]>([]);
+  const [galleryImagePreviews, setGalleryImagePreviews] = useState<string[]>([]);
 
   // State for dynamic fields
   const [bhk2Sizes, setBhk2Sizes] = useState<string[]>([""]);
@@ -344,7 +365,17 @@ export default function SubmitProjectPage() {
   };
 
   const removeGalleryUrl = (index: number) => {
-    const newUrls = galleryUrls.filter((_, i) => i !== index);
+    // Remove the image from all arrays
+    const newGalleryImages = [...galleryImages];
+    newGalleryImages.splice(index, 1);
+    setGalleryImages(newGalleryImages);
+    
+    const newPreviews = [...galleryImagePreviews];
+    newPreviews.splice(index, 1);
+    setGalleryImagePreviews(newPreviews);
+    
+    const newUrls = [...galleryUrls];
+    newUrls.splice(index, 1);
     setGalleryUrls(newUrls);
     form.setValue("galleryUrls", newUrls);
   };
@@ -426,25 +457,19 @@ export default function SubmitProjectPage() {
         formData.append("heroImage", heroImage);
       }
   
-      // Add gallery URLs as JSON string
-      if (filteredData.galleryUrls && filteredData.galleryUrls.length > 0) {
-        // Clean up any URLs that might have curly braces
-        const cleanedUrls = filteredData.galleryUrls.map(url => {
-          if (typeof url === 'string' && url.startsWith('{') && url.endsWith('}')) {
-            return url.substring(1, url.length - 1);
-          }
-          return url;
+      // Add gallery images as files
+      if (galleryImages && galleryImages.length > 0) {
+        console.log(`Adding ${galleryImages.length} gallery images`);
+        
+        // Add each gallery image as a file
+        galleryImages.forEach((file, index) => {
+          console.log(`Adding gallery image ${index + 1}:`, file.name);
+          formData.append('galleryImages', file);
         });
         
-        console.log('Cleaned gallery URLs:', cleanedUrls);
-        
-        // Add as JSON string
-        formData.append('galleryUrls', JSON.stringify(cleanedUrls));
-        
-        // Also add individual URLs for debugging
-        cleanedUrls.forEach((url, index) => {
-          formData.append(`galleryUrl_${index}`, url);
-        });
+        // Add placeholder URLs for validation
+        const placeholders = galleryImages.map(() => "pending-upload");
+        formData.append('galleryUrls', JSON.stringify(placeholders));
       }
   
       // Add user information
@@ -1010,15 +1035,25 @@ export default function SubmitProjectPage() {
               <div className="relative h-[400px] w-full">
                 {heroImagePreview ? (
                   <img
+                    key="hero-image-preview"
                     src={heroImagePreview}
                     alt={formData.projectName}
                     className="w-full h-full object-cover"
+                    loading="eager"
+                    onError={(e) => {
+                      e.currentTarget.src = '/images/property-placeholder.jpg';
+                    }}
                   />
                 ) : formData.heroImageUrl ? (
                   <img
-                    src={formData.heroImageUrl}
+                    key="hero-image-url"
+                    src={formatProjectImageUrl(formData.heroImageUrl)}
                     alt={formData.projectName}
                     className="w-full h-full object-cover"
+                    loading="eager"
+                    onError={(e) => {
+                      e.currentTarget.src = '/images/property-placeholder.jpg';
+                    }}
                   />
                 ) : (
                   <div className="w-full h-full bg-gray-200 flex items-center justify-center">
@@ -1159,9 +1194,14 @@ export default function SubmitProjectPage() {
                       className="h-48 rounded-lg overflow-hidden"
                     >
                       <img
-                        src={url}
+                        key={`gallery-image-${index}`}
+                        src={formatImageUrl(url)}
                         alt={`Gallery image ${index + 1}`}
                         className="w-full h-full object-cover"
+                        loading="eager"
+                        onError={(e) => {
+                          e.currentTarget.src = '/images/property-placeholder.jpg';
+                        }}
                       />
                     </div>
                   ))}
@@ -2733,13 +2773,21 @@ export default function SubmitProjectPage() {
                                       // Create an array to hold the file objects
                                       const files = Array.from(e.target.files);
                                       
-                                      // Create preview URLs and set up form data
+                                      // Create preview URLs
                                       const fileUrls = files.map(file => URL.createObjectURL(file));
                                       
-                                      // Update state with temporary URLs
-                                      const newUrls = [...galleryUrls, ...fileUrls].slice(0, 25);
-                                      setGalleryUrls(newUrls);
-                                      form.setValue("galleryUrls", newUrls);
+                                      // Store the actual files for upload
+                                      const newGalleryImages = [...galleryImages, ...files].slice(0, 25);
+                                      setGalleryImages(newGalleryImages);
+                                      
+                                      // Update preview URLs
+                                      const newPreviews = [...galleryImagePreviews, ...fileUrls].slice(0, 25);
+                                      setGalleryImagePreviews(newPreviews);
+                                      
+                                      // Set placeholder values for form validation
+                                      const placeholders = newGalleryImages.map(() => "pending-upload");
+                                      setGalleryUrls(placeholders);
+                                      form.setValue("galleryUrls", placeholders);
                                       
                                       // Clear the input to allow selecting the same file again
                                       e.target.value = '';
@@ -2761,34 +2809,42 @@ export default function SubmitProjectPage() {
                             </div>
                             
                             {/* Image previews */}
-                            {galleryUrls.length > 0 && (
+                            {galleryImagePreviews.length > 0 && (
                               <div className="space-y-3">
                                 <h4 className="font-medium text-gray-700 flex items-center">
                                   <ImageIcon className="h-4 w-4 mr-2 text-primary" />
-                                  Selected Images ({galleryUrls.length}/25)
+                                  Selected Images ({galleryImagePreviews.length}/25)
                                 </h4>
                                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                                  {galleryUrls.map((url, index) => (
+                                  {galleryImagePreviews.map((url, index) => (
                                     <div key={index} className="relative group">
                                       <div className="relative aspect-square rounded-md overflow-hidden border border-gray-200">
-                                        {url.startsWith('blob:') || url.startsWith('data:') ? (
-                                          <img 
-                                            src={url} 
-                                            alt={`Gallery image ${index + 1}`} 
-                                            className="w-full h-full object-cover"
-                                          />
-                                        ) : (
-                                          <div className="w-full h-full flex items-center justify-center bg-gray-100 text-gray-400">
-                                            <ImageIcon className="h-6 w-6" />
-                                          </div>
-                                        )}
+                                        <img 
+                                          src={url} 
+                                          alt={`Gallery image ${index + 1}`} 
+                                          className="w-full h-full object-cover"
+                                        />
                                         <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                           <Button
                                             type="button"
                                             variant="destructive"
                                             size="icon"
                                             className="h-8 w-8"
-                                            onClick={() => removeGalleryUrl(index)}
+                                            onClick={() => {
+                                              // Remove the image from all arrays
+                                              const newGalleryImages = [...galleryImages];
+                                              newGalleryImages.splice(index, 1);
+                                              setGalleryImages(newGalleryImages);
+                                              
+                                              const newPreviews = [...galleryImagePreviews];
+                                              newPreviews.splice(index, 1);
+                                              setGalleryImagePreviews(newPreviews);
+                                              
+                                              const newUrls = [...galleryUrls];
+                                              newUrls.splice(index, 1);
+                                              setGalleryUrls(newUrls);
+                                              form.setValue("galleryUrls", newUrls);
+                                            }}
                                           >
                                             <Trash2 className="h-4 w-4" />
                                           </Button>
@@ -2896,7 +2952,7 @@ export default function SubmitProjectPage() {
                           )}
                         />
 
-                        <div className="grid grid-cols-1 gap-6">
+                        {/* <div className="grid grid-cols-1 gap-6">
                         <div className="space-y-4">
                           <div className="flex items-center gap-2 mb-2">
                             <MapPin className="h-5 w-5 text-primary" />
@@ -2917,7 +2973,7 @@ export default function SubmitProjectPage() {
                                   </div>
                                   
                                   {/* Location Map Upload */}
-                                  <div className="relative flex flex-col items-center justify-center gap-2">
+                                  {/* <div className="relative flex flex-col items-center justify-center gap-2">
                                     <div className="relative w-full h-[200px] bg-white rounded-lg border-2 border-dashed border-gray-300 transition-all hover:border-primary/70 hover:bg-gray-50/50 group overflow-hidden">
                                       <input
                                         type="file"
@@ -2969,15 +3025,15 @@ export default function SubmitProjectPage() {
                                         </div>
                                       )}
                                     </div>
-                                  </div>
-                                  <FormMessage />
+                                  </div> */}
+                                  {/* <FormMessage />
                                 </FormItem>
                               )}
                             />
                           </div>
-                        </div>
+                        </div> */}
                         
-                        <div className="space-y-4">
+                        {/* <div className="space-y-4">
                           <div className="flex items-center gap-2 mb-2">
                             <Building className="h-5 w-5 text-primary" />
                             <h3 className="text-lg font-medium">Master Plan</h3>
@@ -2997,7 +3053,7 @@ export default function SubmitProjectPage() {
                                   </div>
                                   
                                   {/* Master Plan Upload */}
-                                  <div className="relative flex flex-col items-center justify-center gap-2">
+                                  {/* <div className="relative flex flex-col items-center justify-center gap-2">
                                     <div className="relative w-full h-[200px] bg-white rounded-lg border-2 border-dashed border-gray-300 transition-all hover:border-primary/70 hover:bg-gray-50/50 group overflow-hidden">
                                       <input
                                         type="file"
@@ -3055,9 +3111,9 @@ export default function SubmitProjectPage() {
                               )}
                             />
                           </div>
-                        </div>
-                        </div>
-                      </div>
+                        </div> */} 
+                        {/* </div> */}
+                      </div> 
 
                       <div className="flex justify-between">
                         <Button
@@ -3076,79 +3132,7 @@ export default function SubmitProjectPage() {
                       </div>
                     </TabsContent>
 
-                    <TabsContent value="additional" className="space-y-6">
-                      <div className="space-y-4">
-                        <h3 className="text-lg font-medium">
-                          Home Loan Calculator
-                        </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                          <FormField
-                            control={form.control}
-                            name="loanAmount"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Loan Amount (₹)</FormLabel>
-                                <FormControl>
-                                  <Input
-                                    placeholder="e.g., 5000000"
-                                    {...field}
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-
-                          <FormField
-                            control={form.control}
-                            name="interestRate"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Interest Rate (%)</FormLabel>
-                                <FormControl>
-                                  <Input placeholder="e.g., 8.5" {...field} />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-
-                          <FormField
-                            control={form.control}
-                            name="loanTenure"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Loan Tenure (years)</FormLabel>
-                                <FormControl>
-                                  <Input placeholder="e.g., 20" {...field} />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        </div>
-
-                        {form.watch("loanAmount") &&
-                          form.watch("interestRate") &&
-                          form.watch("loanTenure") && (
-                            <div className="bg-gray-50 p-4 rounded-lg">
-                              <p className="text-sm text-gray-500">
-                                Estimated Monthly EMI
-                              </p>
-                              <p className="text-2xl font-bold">
-                                ₹
-                                {calculateEMI(
-                                  form.watch("loanAmount") || "0",
-                                  form.watch("interestRate") || "0",
-                                  form.watch("loanTenure") || "0",
-                                ).toLocaleString()}
-                              </p>
-                            </div>
-                          )}
-                      </div>
-
-                      <Separator />
-
+                    <TabsContent value="additional" className="space-y-6">                
                       <div className="space-y-4">
                         <FormField
                           control={form.control}

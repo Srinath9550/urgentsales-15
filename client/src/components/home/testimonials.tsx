@@ -24,7 +24,7 @@ export default function Testimonials() {
       content: "Listing my property on urgentsales.in was the best decision I made. The experienced real estate consultants understood my requirements clearly and connected me with genuine buyers immediately. My property sold faster than expected, and I got the best deal. Great service!",
       name: "Priya Patel",
       role: "Property Buyer",
-      location: "Bangalore",
+      location: "Hyderabad",
       rating: 4.5,
       avatar: "https://randomuser.me/api/portraits/women/44.jpg"
     },

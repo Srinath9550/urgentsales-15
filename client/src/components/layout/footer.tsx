@@ -85,8 +85,17 @@ export default function Footer() {
               </li>
               <li>
                 <Link
-                  href="/post-property-free?type=residential"
-                  onClick={() => window.scrollTo(0, 0)}
+                  to={user ? "/post-property-free?type=residential" : "/auth"}
+                  onClick={() => {
+                    window.scrollTo(0, 0);
+                    if (!user) {
+                      toast({
+                        title: "Login Required",
+                        description: "You need to login before posting a property.",
+                        variant: "default",
+                      });
+                    }
+                  }}
                   className="hover:text-white transition-colors"
                 >
                   Post Property FREE
@@ -285,11 +294,11 @@ export default function Footer() {
             </ul>
             <div className="mt-4">
               <Link
-                href="/feedback"
+                href="/channel-partner"
                 onClick={() => window.scrollTo(0, 0)}
                 className="hover:text-white transition-colors"
               >
-                Send Feedback
+                Channel Partner
               </Link>
             </div>
           </div>

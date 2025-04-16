@@ -437,130 +437,15 @@ function CommercialPropertyCard({ property }: CommercialPropertyCardProps) {
         </div>
 
         <div className="flex justify-end pt-1">
-          <Link href={`/project-detail/${property.id}`}>
-            <Button
-              size="sm"
-              onClick={() => window.scrollTo(0, 0)}
-              className="bg-red-600 hover:bg-red-700 text-xs sm:text-sm py-1 sm:py-2 h-auto"
-            >
-              See Details
-            </Button>
-          </Link>
+          <Button
+            size="sm"
+            className="bg-red-600 hover:bg-red-700 text-xs sm:text-sm py-1 sm:py-2 h-auto"
+          >
+            See Details
+          </Button>
         </div>
       </div>
-    </div>
+      </div>
     </Link>
   );
 }
-
-// Mock data for development and fallback
-// const mockCommercialProperties: CommercialProperty[] = [
-//   {
-//     id: "c1",
-//     title: "Office Spaces, Shops & Showrooms",
-//     propertyType: "Commercial",
-//     locality: "Malkajgiri",
-//     city: "Hyderabad",
-//     state: "Telangana",
-//     price: "1.04",
-//     pricePerSqFt: "7,500",
-//     imageUrl:
-//       "https://images.unsplash.com/photo-1497366754035-f200968a6e72?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
-//     postedDate: "Dec 31, '24",
-//     builder: "Jain Construction",
-//     featured: true,
-//     possession: "Ready to Move",
-//     area: "1200-2500 sq.ft",
-//     amenities: ["24/7 Security", "Power Backup", "Parking"],
-//   },
-//   {
-//     id: "c2",
-//     title: "Premium Retail Spaces",
-//     propertyType: "Commercial",
-//     locality: "Gachibowli",
-//     city: "Hyderabad",
-//     state: "Telangana",
-//     price: "2.15",
-//     pricePerSqFt: "9,200",
-//     imageUrl:
-//       "https://images.unsplash.com/photo-1497366811353-6870744d04b2?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
-//     postedDate: "Dec 28, '24",
-//     builder: "Prestige Group",
-//     featured: false,
-//     possession: "Q2 2025",
-//     area: "800-1500 sq.ft",
-//     amenities: ["Food Court", "Elevator", "CCTV"],
-//   },
-//   {
-//     id: "c3",
-//     title: "IT Park Office Spaces",
-//     propertyType: "Commercial",
-//     locality: "HITEC City",
-//     city: "Hyderabad",
-//     state: "Telangana",
-//     price: "3.50",
-//     pricePerSqFt: "11,000",
-//     imageUrl:
-//       "https://images.unsplash.com/photo-1556761175-4b46a572b786?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
-//     postedDate: "Dec 25, '24",
-//     builder: "DLF Commercial",
-//     featured: true,
-//     possession: "Ready to Move",
-//     area: "5000-15000 sq.ft",
-//     amenities: ["Conference Room", "Cafeteria", "Gym"],
-//   },
-//   {
-//     id: "c4",
-//     title: "Amaravati Business Hub",
-//     propertyType: "Commercial",
-//     locality: "Amaravati",
-//     city: "Vijayawada",
-//     state: "Andhra Pradesh",
-//     price: "1.75",
-//     pricePerSqFt: "6,800",
-//     imageUrl:
-//       "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
-//     postedDate: "Dec 20, '24",
-//     builder: "Amaravati Developers",
-//     featured: true,
-//     possession: "Q3 2025",
-//     area: "1000-3000 sq.ft",
-//     amenities: ["Smart Building", "Landscaped Garden", "24/7 Security"],
-//   },
-//   {
-//     id: "c5",
-//     title: "Vizag Tech Park",
-//     propertyType: "Commercial",
-//     locality: "Rushikonda",
-//     city: "Visakhapatnam",
-//     state: "Andhra Pradesh",
-//     price: "2.25",
-//     pricePerSqFt: "7,200",
-//     imageUrl:
-//       "https://images.unsplash.com/photo-1577760258779-e787a1733016?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
-//     postedDate: "Dec 18, '24",
-//     builder: "Vizag Realty",
-//     featured: false,
-//     possession: "Ready to Move",
-//     area: "2000-5000 sq.ft",
-//     amenities: ["Sea View", "Conference Facilities", "Parking"],
-//   },
-//   {
-//     id: "c6",
-//     title: "Tirupati Commercial Complex",
-//     propertyType: "Commercial",
-//     locality: "Tiruchanur",
-//     city: "Tirupati",
-//     state: "Andhra Pradesh",
-//     price: "1.20",
-//     pricePerSqFt: "5,500",
-//     imageUrl:
-//       "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
-//     postedDate: "Dec 15, '24",
-//     builder: "Tirupati Constructions",
-//     featured: true,
-//     possession: "Q1 2025",
-//     area: "600-1200 sq.ft",
-//     amenities: ["Temple Proximity", "Tourist Footfall", "Parking"],
-//   },
-// ];

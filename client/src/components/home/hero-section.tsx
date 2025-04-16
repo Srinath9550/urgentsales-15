@@ -6,7 +6,7 @@ import PropertySearch from "@/components/property/property-search";
 const slides = [
   {
     id: 1,
-    image: "https://images.unsplash.com/photo-1600585154340-be6161a56a0c",
+    image: "https://images.unsplash.com/photo-1512917774080-9991f1c4c750",
     title: "Fast Sales for Sellers, Best Deals for Buyers!",
     subtitleWords: ["Budget-Friendly Homes"],
     // color: "from-blue-900 to-blue-700",

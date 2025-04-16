@@ -68,6 +68,7 @@ import SubmitProjectPage from "@/pages/submit-project";
 import { queryClient } from "@/lib/query-client";
 
 import PartnerWithUs from "./pages/partner-with-us";
+import ChannelPartnerPage from "@/pages/channel-partner";
 import Careers from "@/pages/careers";
 
 //  Ad Packeges
@@ -201,6 +202,7 @@ function App() {
             </ProtectedRoute>
           </Route>
 
+          <Route path="/channel-partner" component={ChannelPartnerPage} />
           <Route path="/partner-with-us" component={PartnerWithUs} />
           <Route path="/careers" component={Careers} />
 

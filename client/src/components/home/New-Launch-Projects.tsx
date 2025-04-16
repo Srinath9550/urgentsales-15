@@ -7,7 +7,8 @@ import { formatImageUrl, handleImageError } from "@/lib/image-utils";
 interface Project {
   id: string;
   title: string;
-  imageUrl: string;
+  imageUrl?: string;
+  imageUrls?: string[];
   description?: string;
 }
 
@@ -216,11 +217,16 @@ export default function NewLaunchProjects() {
                   aria-label={`View details for ${project.title}`}
                 >
                   <img
-                    src={formatImageUrl(project.imageUrl)}
+                    src={formatImageUrl(
+                      project.imageUrls && project.imageUrls.length > 0 
+                        ? project.imageUrls[0] 
+                        : project.imageUrl || '', 
+                      true
+                    )}
                     alt={project.title}
                     className="w-full h-full object-cover"
                     loading={index < 10 ? "eager" : "lazy"}
-                    onError={(e) => handleImageError(e)}
+                    onError={(e) => handleImageError(e, undefined, true)}
                   />
                   <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-2 sm:p-3">
                     <p className="text-white text-xs sm:text-sm font-medium truncate">

@@ -251,3 +251,9 @@ app.get('/test-email', async (req, res) => {
     res.status(500).send(`Email failed: ${error instanceof Error ? error.message : error}`);
   }
 });
+
+// Import debug routes
+import debugRoutes from './routes/debug-routes';
+
+// Register debug routes
+app.use('/api/debug', debugRoutes);

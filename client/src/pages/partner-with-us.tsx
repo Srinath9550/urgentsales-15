@@ -249,6 +249,36 @@ export default function PartnerWithUs() {
           </div>
         </section>
 
+        {/* Channel Partner Section */}
+        <section className="py-12 bg-white">
+          <div className="container mx-auto px-4">
+            <div className="max-w-4xl mx-auto text-center">
+              <p className="text-xl text-primary font-medium mb-6">
+                We are open for channel sales partner program
+              </p>
+              
+              <h2 className="text-3xl md:text-4xl font-bold mb-6">
+                Are you Ready to sell your project<br />
+                Faster than others?
+              </h2>
+              
+              <p className="text-lg text-gray-700 mb-8"> If
+<span className="font-bold text-primary animate-pulse bg-gradient-to-r from-yellow-200 to-yellow-500 bg-clip-text text-transparent"> "Yes"</span>, click the button below to learn more about our Channel Partner program
+<div className="mt-2">
+</div>
+              </p>
+              
+              <Button 
+                size="lg" 
+                className="bg-primary hover:bg-primary/90 text-white font-semibold px-8 py-6 h-auto text-lg"
+                onClick={() => window.location.href = '/channel-partner'}
+              >
+                Become a Channel Partner
+              </Button>
+            </div>
+          </div>
+        </section>
+
         {/* Partnership Form */}
         <section className="py-12 bg-white">
           <div className="container mx-auto px-4 max-w-2xl">

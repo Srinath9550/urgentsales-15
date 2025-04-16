@@ -35,12 +35,12 @@ export async function sendEmailOTP(email: string, otp: string) {
     console.log(`EMAIL OTP for ${email}: ${otp}`);
     console.log(`=========================================`);
 
-    // Gmail SMTP setup with the provided credentials
+    // Gmail SMTP setup with credentials from environment variables
     const transporter = nodemailer.createTransport({
       service: "gmail",
       auth: {
-        user: "srinathballa20@gmail.com", // User provided email
-        pass: "veou uoap olix rlqa", // User provided app password
+        user: process.env.EMAIL_USER || "urgentsale.in@gmail.com", // Get from env or fallback
+        pass: process.env.EMAIL_PASSWORD || "krcd vaci ldzw kmpl", // Get from env or fallback
       },
       // Add timeout settings to prevent hanging connections
       connectionTimeout: 10000, // 10 seconds
@@ -59,13 +59,13 @@ export async function sendEmailOTP(email: string, otp: string) {
 
     // Email content
     const mailOptions = {
-      from: '"Real Estate Platform" <urgentsales.in@gmail.com>',
+      from: `"Urgent Sales.in " <${process.env.EMAIL_USER || "urgentsale.in@gmail.com"}>`,
       to: email,
-      subject: "Your Real Estate Platform Verification Code",
+      subject: "Your UrgentSales Platform Verification Code",
       text: `Your OTP for account verification is: ${otp}. This code will expire in 10 minutes.`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px;">
-          <h2 style="color: #4a6ee0;">Real Estate Platform - Verification</h2>
+          <h2 style="color: #4a6ee0;">UrgentSales Platform - Verification</h2>
           <p>Hello,</p>
           <p>Thank you for registering with our platform. Please use the verification code below to complete your account setup:</p>
           <div style="background-color: #f7f7f7; padding: 15px; text-align: center; font-size: 24px; font-weight: bold; letter-spacing: 5px; margin: 20px 0; border-radius: 4px;">
@@ -73,7 +73,7 @@ export async function sendEmailOTP(email: string, otp: string) {
           </div>
           <p>This code will expire in <strong>10 minutes</strong>.</p>
           <p>If you didn't request this code, please ignore this email.</p>
-          <p>Best regards,<br>The Real Estate Team</p>
+          <p>Best regards,<br>The UrgentSales Team</p>
         </div>
       `,
     };
@@ -356,14 +356,14 @@ async function sendPasswordResetEmail(email: string, resetToken: string) {
     const transporter = nodemailer.createTransport({
       service: "gmail",
       auth: {
-        user: "srinathballa20@gmail.com", // User provided email
-        pass: "veou uoap olix rlqa", // User provided app password
+        user: process.env.EMAIL_USER || "urgentsale.in@gmail.com", // Get from env or fallback
+        pass: process.env.EMAIL_PASSWORD || "krcd vaci ldzw kmpl", // Get from env or fallback
       },
     });
 
     // Email content
     const mailOptions = {
-      from: '"Real Estate Platform" <urgentsales.in@gmail.com>',
+      from: `"UrgentSales.in Platform" <${process.env.EMAIL_USER || "urgentsale.in@gmail.com"}>`,
       to: email,
       subject: "Reset Your Password - Urgent Sales",
       text: `You requested a password reset. Click the following link to reset your password: ${resetUrl}. This link will expire in 1 hour.`,

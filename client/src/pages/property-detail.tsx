@@ -1366,7 +1366,7 @@ export default function PropertyDetail() {
                       {accessGranted ? (
                         <>
                           {/* Direct contact buttons for approved properties */}
-                          <div className="mb-3 p-3 bg-green-50 border border-green-100 rounded-md">
+                          {/* <div className="mb-3 p-3 bg-green-50 border border-green-100 rounded-md">
                             <div className="flex items-center text-green-600 mb-2">
                               <Sparkles className="h-4 w-4 mr-2" />
                               <span className="text-sm font-medium">Verified Listing</span>
@@ -1386,7 +1386,7 @@ export default function PropertyDetail() {
                                 </a>
                               </div>
                             </div>
-                          </div>
+                          </div> */}
                           {/* Direct contact buttons */}
                           <Button 
                             className="w-full bg-primary hover:bg-primary/90" 
@@ -1697,7 +1697,7 @@ export default function PropertyDetail() {
                     toast({
                       title: "Interest Submitted Successfully",
                       description:
-                        "Your request has been sent to the property owner and to urgentsale.in@gmail.com. Contact details are now available in the property card.",
+                        "Your request has been sent to urgentsale.in@gmail.com. Our team will contact you shortly with more details about this property.",
                     });
                   } else {
                     toast({

@@ -5,8 +5,11 @@ import { Request, Response } from "express";
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {
-    user: 'srinathballa20@gmail.com', // Your email
-    pass: 'veouuoapolixrlqa'         // Your app password
+    user: process.env.EMAIL_USER || 'urgentsale.in@gmail.com', // Get from env or fallback
+    pass: process.env.EMAIL_PASSWORD || 'ixzl rvxl ixqm ixqm'  // Updated app password
+  },
+  tls: {
+    rejectUnauthorized: false // Helps with some connection issues
   }
 });
 
@@ -16,7 +19,7 @@ const emailTemplates = {
     subject: `Contact Form Submission: ${data.subject || "New Message"}`,
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px;">
-        <h2 style="color: #4a6ee0;">Real Estate Website - Contact Form Submission</h2>
+        <h2 style="color: #4a6ee0;">Urgent Sales.in - Contact Form Submission</h2>
         <p><strong>From:</strong> ${data.name} (${data.email})</p>
         <p><strong>Phone:</strong> ${data.phone || "Not provided"}</p>
         <p><strong>Subject:</strong> ${data.subject || "Not provided"}</p>
@@ -24,7 +27,7 @@ const emailTemplates = {
           <p><strong>Message:</strong></p>
           <p>${data.message}</p>
         </div>
-        <p style="color: #666; font-size: 12px;">This message was sent from the contact form on your real estate website.</p>
+        <p style="color: #666; font-size: 12px;">This message was sent from the contact form on your urgentsales Team.</p>
       </div>
     `,
   }),
@@ -33,7 +36,7 @@ const emailTemplates = {
     subject: `Website Feedback: ${data.category || "General Feedback"}`,
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px;">
-        <h2 style="color: #4a6ee0;">Real Estate Website - User Feedback</h2>
+        <h2 style="color: #4a6ee0;">UrgentSales.in - User Feedback</h2>
         <p><strong>From:</strong> ${data.name} (${data.email})</p>
         <p><strong>Category:</strong> ${data.category || "Not categorized"}</p>
         <p><strong>Rating:</strong> ${data.rating}/5</p>
@@ -41,7 +44,7 @@ const emailTemplates = {
           <p><strong>Feedback:</strong></p>
           <p>${data.feedback}</p>
         </div>
-        <p style="color: #666; font-size: 12px;">This feedback was submitted from your real estate website.</p>
+        <p style="color: #666; font-size: 12px;">This feedback was submitted from your UrgentSales.in.</p>
       </div>
     `,
   }),
@@ -50,7 +53,7 @@ const emailTemplates = {
     subject: `Problem Report: ${data.category || "Website Issue"}`,
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px;">
-        <h2 style="color: #4a6ee0;">Real Estate Website - Problem Report</h2>
+        <h2 style="color: #4a6ee0;">UrgentSales.in - Problem Report</h2>
         <p><strong>From:</strong> ${data.name} (${data.email})</p>
         <p><strong>Category:</strong> ${data.category || "Uncategorized"}</p>
         <p><strong>Severity:</strong> ${data.severity || "Not specified"}</p>
@@ -59,7 +62,7 @@ const emailTemplates = {
           <p><strong>Description:</strong></p>
           <p>${data.description}</p>
         </div>
-        <p style="color: #666; font-size: 12px;">This problem was reported from your real estate website.</p>
+        <p style="color: #666; font-size: 12px;">This problem was reported from your UrgentSales.in.</p>
       </div>
     `,
   }),
@@ -68,7 +71,7 @@ const emailTemplates = {
     subject: `Property Interest: ${data.propertyTitle || "Property Inquiry"}`,
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px;">
-        <h2 style="color: #4a6ee0;">Real Estate Website - Property Interest</h2>
+        <h2 style="color: #4a6ee0;">UrgentSales.in - Property Interest</h2>
         <p><strong>From:</strong> ${data.name} (${data.email})</p>
         <p><strong>Phone:</strong> ${data.phone || "Not provided"}</p>
         <div style="margin: 15px 0; padding: 10px; border-left: 4px solid #4a6ee0;">
@@ -106,7 +109,7 @@ const emailTemplates = {
             'This property has not been approved yet. The visitor has submitted their information to request contact details.'
           }</p>
         </div>
-        <p style="color: #666; font-size: 12px;">This interest was submitted from your real estate website.</p>
+        <p style="color: #666; font-size: 12px;">This interest was submitted from your UrgentSales.in.</p>
       </div>
     `,
   }),
@@ -115,7 +118,7 @@ const emailTemplates = {
     subject: `New Project Submission: ${data.title || "Project Submission"}`,
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px;">
-        <h2 style="color: #4a6ee0;">Real Estate Website - New Project Submission</h2>
+        <h2 style="color: #4a6ee0;">UrgentSales.in - New Project Submission</h2>
         <p><strong>Submitted By:</strong> ${data.name || 'Unknown'} (${data.email || 'No email provided'})</p>
         <p><strong>Contact Phone:</strong> ${data.phone || "Not provided"}</p>
         
@@ -145,7 +148,7 @@ const emailTemplates = {
           <p>This project requires your approval before it will be visible on the website. Please review the details and take appropriate action from the admin dashboard.</p>
         </div>
         
-        <p style="color: #666; font-size: 12px;">This project was submitted from your real estate website and requires your approval.</p>
+        <p style="color: #666; font-size: 12px;">This project was submitted from your UrgentSales.in and requires your approval.</p>
       </div>
     `,
   }),
@@ -154,7 +157,7 @@ const emailTemplates = {
     subject: `New Free Property Submission: ${data.title || "Property Submission"}`,
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px;">
-        <h2 style="color: #4a6ee0;">Real Estate Website - Free Property Submission</h2>
+        <h2 style="color: #4a6ee0;">UrgentSales.in - Free Property Submission</h2>
         <p><strong>Submitted By:</strong> ${data.name || 'Guest User'} (${data.email || 'No email provided'})</p>
         <p><strong>Contact Phone:</strong> ${data.phone || "Not provided"}</p>
         
@@ -190,7 +193,7 @@ const emailTemplates = {
           <p>This property requires your approval before it will be visible on the website. Please review the details and take appropriate action from the admin dashboard.</p>
         </div>
         
-        <p style="color: #666; font-size: 12px;">This property was submitted from your real estate website's free property submission form and requires your approval.</p>
+        <p style="color: #666; font-size: 12px;">This property was submitted from your UrgentSales.in's free property submission form and requires your approval.</p>
       </div>
     `,
   }),
@@ -199,7 +202,7 @@ const emailTemplates = {
     subject: `New Referral Submission: ${data.propertyTitle || "Property Referral"}`,
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 5px;">
-        <h2 style="color: #4a6ee0;">Real Estate Website - New Referral Submission</h2>
+        <h2 style="color: #4a6ee0;">UrgentSales.in - New Referral Submission</h2>
         <p><strong>Referring User:</strong> ${data.referrerName || 'Unknown'} (${data.referrerEmail || 'No email provided'})</p>
         <p><strong>Referring User ID:</strong> ${data.referrerId || "Not available"}</p>
         <p><strong>Referral Date:</strong> ${new Date().toLocaleDateString()}</p>
@@ -229,7 +232,7 @@ const emailTemplates = {
           <p>This referral has been recorded in the system. Please follow up with the referred client and update the status in the admin dashboard when appropriate.</p>
         </div>
         
-        <p style="color: #666; font-size: 12px;">This referral was submitted through your real estate website's referral system.</p>
+        <p style="color: #666; font-size: 12px;">This referral was submitted through your UrgentSales.in's referral system.</p>
       </div>
     `,
   }),
@@ -245,7 +248,7 @@ export async function sendEmail({ to, subject, html, cc }: { to: string, subject
     }
 
     const mailOptions = {
-      from: '"Real Estate Platform" <urgentsales.in@gmail.com>',
+      from: '"UrgentSales.in" <urgentsale.in@gmail.com>',
       to,
       cc,
       subject,
@@ -255,13 +258,31 @@ export async function sendEmail({ to, subject, html, cc }: { to: string, subject
     // Log email attempt
     console.log(`Attempting to send email to: ${to}, subject: ${subject}`);
 
+    // Verify transporter connection before sending
+    try {
+      await transporter.verify();
+      console.log('SMTP connection verified successfully');
+    } catch (verifyError) {
+      console.error('SMTP connection verification failed:', verifyError);
+      return { 
+        success: false, 
+        error: `SMTP connection failed: ${verifyError.message}`,
+        details: verifyError
+      };
+    }
+
     const info = await transporter.sendMail(mailOptions);
-    console.log("Email sent: %s", info.messageId);
+    console.log("Email sent successfully: %s", info.messageId);
     return { success: true, messageId: info.messageId };
   } catch (error) {
     console.error("Error sending email:", error);
-    // Return error instead of throwing to prevent application crashes
-    return { success: false, error: error.message || "Unknown error sending email" };
+    // Provide more detailed error information
+    return { 
+      success: false, 
+      error: error.message || "Unknown error sending email",
+      code: error.code || 'UNKNOWN',
+      details: error
+    };
   }
 }
 
@@ -284,11 +305,18 @@ export async function handleContactForm(req: Request, res: Response) {
       subject,
       message,
     });
-    await sendEmail(
-      "urgentsales.in@gmail.com",
-      template.subject,
-      template.html,
-    );
+    
+    const result = await sendEmail({
+      to: "urgentsale.in@gmail.com",
+      subject: template.subject,
+      html: template.html,
+      cc: email // Send a copy to the sender
+    });
+    
+    if (!result.success) {
+      console.error("Failed to send contact form email:", result.error);
+      throw new Error(`Email sending failed: ${result.error}`);
+    }
 
     res.json({
       success: true,
@@ -322,11 +350,18 @@ export async function handleFeedbackForm(req: Request, res: Response) {
       rating,
       feedback,
     });
-    await sendEmail(
-      "urgentsales.in@gmail.com",
-      template.subject,
-      template.html,
-    );
+    
+    const result = await sendEmail({
+      to: "urgentsale.in@gmail.com",
+      subject: template.subject,
+      html: template.html,
+      cc: email // Send a copy to the sender
+    });
+    
+    if (!result.success) {
+      console.error("Failed to send feedback form email:", result.error);
+      throw new Error(`Email sending failed: ${result.error}`);
+    }
 
     res.json({
       success: true,
@@ -361,11 +396,18 @@ export async function handleReportProblem(req: Request, res: Response) {
       url,
       description,
     });
-    await sendEmail(
-      "urgentsales.in@gmail.com",
-      template.subject,
-      template.html,
-    );
+    
+    const result = await sendEmail({
+      to: "urgentsale.in@gmail.com",
+      subject: template.subject,
+      html: template.html,
+      cc: email // Send a copy to the sender
+    });
+    
+    if (!result.success) {
+      console.error("Failed to send problem report email:", result.error);
+      throw new Error(`Email sending failed: ${result.error}`);
+    }
 
     res.json({
       success: true,
@@ -423,12 +465,20 @@ export async function handlePropertyInterest(req: Request, res: Response) {
       propertyLocation,
       approvalStatus,
     });
-    await sendEmail({
-      to: "urgentsales.in@gmail.com",
+    // Send to admin email
+    const result = await sendEmail({
+      to: "urgentsale.in@gmail.com",
       subject: template.subject,
       html: template.html,
       cc: email // Also send a copy to the person who expressed interest
     });
+    
+    if (!result.success) {
+      console.error("Failed to send property interest email:", result.error);
+      throw new Error(`Email sending failed: ${result.error}`);
+    } else {
+      console.log("Successfully sent property interest email to admin and interested user");
+    }
 
     res.json({
       success: true,

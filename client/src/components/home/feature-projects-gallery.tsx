@@ -4,13 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useLocation } from "wouter";
 import { formatImageUrl, handleImageError } from "@/lib/image-utils";
 
-interface Project {
-  id: number;
-  url: string;
-  alt: string;
-  name: string;
-  location: string;
-}
+import { Project } from "@/types/property-types";
 
 export default function FeatureProjectsGallery() {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -241,19 +235,24 @@ export default function FeatureProjectsGallery() {
                   aria-label={`View details of ${project.name} in ${project.location}`}
                 >
                   <img
-                    src={formatImageUrl(project.url)}
-                    alt={project.alt}
+                    src={formatImageUrl(
+                      project.imageUrls && project.imageUrls.length > 0 
+                        ? project.imageUrls[0] 
+                        : project.url || '', 
+                      true
+                    )}
+                    alt={project.alt || project.title || project.name || 'Featured project'}
                     className="w-full h-full object-cover"
                     loading={index < 10 ? "eager" : "lazy"}
-                    onError={(e) => handleImageError(e)}
+                    onError={(e) => handleImageError(e, undefined, true)}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent opacity-70 group-hover:opacity-90 transition-opacity"></div>
                   <div className="absolute bottom-0 left-0 right-0 p-2 sm:p-3 text-white">
                     <h3 className="text-sm sm:text-base md:text-lg font-semibold truncate">
-                      {project.name}
+                      {project.name || project.title || 'Featured Project'}
                     </h3>
                     <p className="text-xs sm:text-sm text-gray-200 truncate">
-                      {project.location}
+                      {project.location || 'Premium Location'}
                     </p>
                     <span className="text-[10px] sm:text-xs text-white/80 mt-0.5 hidden group-hover:inline-block">
                       Click to view details

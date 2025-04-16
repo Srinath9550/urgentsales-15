@@ -18,22 +18,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatImageUrl, handleImageError } from "@/lib/image-utils";
 
-interface LuxuryProject {
-  id: string;
-  title: string;
-  location: string;
-  city: string;
-  price: string;
-  priceRange?: string;
-  bhkConfig: string;
-  imageUrl: string;
-  builder: string;
-  amenities: string[];
-  rating: number;
-  featured?: boolean;
-  tags?: string[];
-  description?: string;
-}
+import { LuxuryProject } from "@/types/property-types";
 
 export default function LuxuryProjects() {
   const [savedProjects, setSavedProjects] = useState<string[]>([]);
@@ -195,16 +180,26 @@ export default function LuxuryProjects() {
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
             {projectsArray.map((project, index) => (
-              <div
-                key={project.id}
-                className={`flex flex-col ${index % 2 === 0 ? "md:flex-row" : "md:flex-row-reverse"} gap-6 bg-green-50 hover:bg-green-100 transition-colors duration-300 rounded-lg overflow-hidden`}
+              <Link 
+                key={project.id} 
+                href={`/project/${project.id}`}
+                className="block"
+                onClick={() => window.scrollTo(0, 0)}
               >
+                <div
+                  className={`flex flex-col ${index % 2 === 0 ? "md:flex-row" : "md:flex-row-reverse"} gap-6 bg-green-50 hover:bg-green-100 transition-colors duration-300 rounded-lg overflow-hidden`}
+                >
                 <div className="relative w-full md:w-96 h-64 md:h-auto">
                   <img
-                    src={formatImageUrl(project.imageUrl)}
+                    src={formatImageUrl(
+                      project.imageUrls && project.imageUrls.length > 0 
+                        ? project.imageUrls[0] 
+                        : project.imageUrl || '', 
+                      true
+                    )}
                     alt={project.title}
                     className="w-full h-full object-cover"
-                    onError={(e) => handleImageError(e)}
+                    onError={(e) => handleImageError(e, undefined, true)}
                   />
                   {project.featured && (
                     <div className="absolute top-3 left-3 bg-yellow-500 text-white text-xs px-2 py-1 rounded-md">
@@ -297,7 +292,7 @@ export default function LuxuryProjects() {
                     <div className="text-xs text-gray-500">
                       By {project.builder}
                     </div>
-                    <Link href={`/project-detail/${project.id}`}>
+                    <Link href={`/project/${project.id}`}>
                       <Button size="sm" className="text-xs h-9" onClick={() => window.scrollTo(0, 0)}>
                         View Details
                       </Button>
@@ -305,6 +300,7 @@ export default function LuxuryProjects() {
                   </div>
                 </div>
               </div>
+              </Link>
             ))}
           </div>
         )}
